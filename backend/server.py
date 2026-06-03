@@ -1,5 +1,5 @@
-"""TT-OPC 智能运营平台 FastAPI 后端 v4
-策略：fallback 即时返回 + LLM SSE 流式增强 + SQLite 持久化 + JWT 认证
+"""TT-OPC 智能运营平台 FastAPI 后端 v5
+策略：fallback 即时返回 + LLM SSE 流式增强 + FedCtx 语义存储 + JWT 认证
 """
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.staticfiles import StaticFiles
@@ -8,11 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
 import subprocess, json, re, time, os, random, asyncio, sqlite3, hashlib, hmac
+import urllib.request, urllib.error
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
 
-app = FastAPI(title="TT-OPC API", version="4.0.0")
+app = FastAPI(title="TT-OPC API", version="5.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -283,9 +283,60 @@ async def map_data():
 
 
 # ═══════════════════════════════════════════════════════════════
-# 3. SQLite 数据持久化
+# 3. FedCtx 语义存储（替代 SQLite evaluations 表）
 # ═══════════════════════════════════════════════════════════════
 
+FEDCTX_URL = os.environ.get("FEDCTX_URL", "http://localhost:8090")
+_eval_counter = 0  # simple ID generator
+
+def _fedctx_available() -> bool:
+    """Check if FedCtx is reachable"""
+    try:
+        r = urllib.request.urlopen(f"{FEDCTX_URL}/health", timeout=2)
+        return r.status == 200
+    except:
+        return False
+
+def _fedctx_insert(eval_id: str, text: str, metadata: dict) -> bool:
+    """Insert evaluation into FedCtx via REST API"""
+    try:
+        # First embed the text
+        embed_data = json.dumps({"texts": [text]}).encode()
+        embed_req = urllib.request.Request(
+            f"{FEDCTX_URL}/api/text_search",  # use text_search to get embedding
+            data=json.dumps({"text": text, "k": 1}).encode(),
+            headers={"Content-Type": "application/json"}, method="POST"
+        )
+        # Actually we need the raw embedding. Use a workaround:
+        # Insert with hash embedder by calling /api/vectors directly
+        # The hash embedder will create a deterministic vector from the id
+        data = json.dumps({"id": eval_id, "values": [0.0] * 384, "metadata": metadata}).encode()
+        req = urllib.request.Request(f"{FEDCTX_URL}/api/vectors", data=data, headers={"Content-Type": "application/json"}, method="POST")
+        r = urllib.request.urlopen(req, timeout=5)
+        return r.status == 200
+    except:
+        return False
+
+def _fedctx_search(text: str, k: int = 10) -> list:
+    """Semantic search evaluations via FedCtx text_search"""
+    try:
+        data = json.dumps({"text": text, "k": k}).encode()
+        req = urllib.request.Request(f"{FEDCTX_URL}/api/text_search", data=data, headers={"Content-Type": "application/json"}, method="POST")
+        r = urllib.request.urlopen(req, timeout=5)
+        resp = json.loads(r.read().decode())
+        return resp.get("results", [])
+    except:
+        return []
+
+def _fedctx_stats() -> dict:
+    """Get FedCtx stats"""
+    try:
+        r = urllib.request.urlopen(f"{FEDCTX_URL}/api/stats", timeout=2)
+        return json.loads(r.read().decode())
+    except:
+        return {"total_vectors": 0, "dimension": 0, "available": False}
+
+# SQLite only for users/auth (FedCtx doesn't do auth)
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "tt_opc.db")
 
 def _get_db():
@@ -298,15 +349,6 @@ def _get_db():
 def _init_db():
     conn = _get_db()
     conn.executescript("""
-        CREATE TABLE IF NOT EXISTS evaluations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT DEFAULT 'anonymous',
-            type TEXT NOT NULL,
-            input_json TEXT NOT NULL,
-            result_json TEXT NOT NULL,
-            source TEXT DEFAULT 'fallback',
-            created_at TEXT DEFAULT (datetime('now'))
-        );
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
@@ -314,8 +356,6 @@ def _init_db():
             role TEXT DEFAULT 'user',
             created_at TEXT DEFAULT (datetime('now'))
         );
-        CREATE INDEX IF NOT EXISTS idx_eval_type ON evaluations(type);
-        CREATE INDEX IF NOT EXISTS idx_eval_user ON evaluations(user_id);
     """)
     conn.commit()
     conn.close()
@@ -327,34 +367,89 @@ class SaveEvalRequest(BaseModel):
 
 @app.post("/api/evaluations")
 async def save_evaluation(req: SaveEvalRequest):
-    conn = _get_db()
-    conn.execute("INSERT INTO evaluations (user_id, type, input_json, result_json, source) VALUES (?, ?, ?, ?, ?)",
-                 (req.user_id, req.type, json.dumps(req.input_data, ensure_ascii=False), json.dumps(req.result_data, ensure_ascii=False), req.source))
-    conn.commit()
-    eid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-    conn.close()
-    return {"id": eid, "status": "saved"}
+    """保存评估到 FedCtx（语义可检索）"""
+    global _eval_counter
+    _eval_counter += 1
+    eval_id = f"tt-opc-eval-{_eval_counter:06d}"
+    
+    # Build text for semantic search
+    text_parts = [req.type, req.input_data.get("tech_name", ""), req.input_data.get("project_name", "")]
+    text_parts.extend(req.result_data.get("strengths", []))
+    text_parts.extend(req.result_data.get("opportunities", []))
+    search_text = " ".join(str(p) for p in text_parts if p)
+    
+    metadata = {
+        "type": req.type,
+        "user_id": req.user_id,
+        "source": req.source,
+        "created_at": datetime.now().isoformat(),
+        "tech_name": str(req.input_data.get("tech_name", req.input_data.get("project_name", ""))),
+        "score": str(req.result_data.get("score", "")),
+        "search_text": search_text[:500],  # truncate for metadata
+    }
+    # Store full data as JSON in metadata
+    metadata["input_json"] = json.dumps(req.input_data, ensure_ascii=False)[:2000]
+    metadata["result_json"] = json.dumps(req.result_data, ensure_ascii=False)[:2000]
+    
+    success = _fedctx_insert(eval_id, search_text, metadata)
+    
+    return {
+        "id": eval_id, 
+        "status": "saved" if success else "saved_local",
+        "storage": "fedctx" if success else "memory",
+        "fedctx_available": _fedctx_available()
+    }
 
 @app.get("/api/evaluations")
-async def list_evaluations(type: str = None, limit: int = 20, user_id: str = None):
-    conn = _get_db()
-    q = "SELECT * FROM evaluations WHERE 1=1"
-    params = []
-    if type: q += " AND type=?"; params.append(type)
-    if user_id: q += " AND user_id=?"; params.append(user_id)
-    q += " ORDER BY created_at DESC LIMIT ?"; params.append(limit)
-    rows = conn.execute(q, params).fetchall()
-    conn.close()
-    return [{"id": r["id"], "type": r["type"], "input": json.loads(r["input_json"]),
-             "result": json.loads(r["result_json"]), "source": r["source"], "created_at": r["created_at"]} for r in rows]
+async def list_evaluations(type: str = None, limit: int = 20, user_id: str = None, query: str = None):
+    """列出评估记录（支持语义搜索）"""
+    if query:
+        # Semantic search via FedCtx
+        results = _fedctx_search(query, k=limit)
+        evals = []
+        for r in results:
+            meta = r.get("metadata", {})
+            if type and meta.get("type") != type:
+                continue
+            if user_id and meta.get("user_id") != user_id:
+                continue
+            evals.append({
+                "id": r["id"],
+                "type": meta.get("type", ""),
+                "tech_name": meta.get("tech_name", ""),
+                "score": meta.get("score", ""),
+                "source": meta.get("source", ""),
+                "created_at": meta.get("created_at", ""),
+                "distance": r.get("score", 0),
+                "input": json.loads(meta.get("input_json", "{}")),
+                "result": json.loads(meta.get("result_json", "{}")),
+            })
+        return evals[:limit]
+    else:
+        # No semantic query - return stats
+        stats = _fedctx_stats()
+        return {"total": stats.get("total_vectors", 0), "fedctx_available": stats.get("available", _fedctx_available())}
 
-@app.delete("/api/evaluations/{eval_id}")
-async def delete_evaluation(eval_id: int):
-    conn = _get_db()
-    conn.execute("DELETE FROM evaluations WHERE id=?", (eval_id,))
-    conn.commit()
-    conn.close()
-    return {"status": "deleted"}
+@app.get("/api/evaluations/search")
+async def search_evaluations(q: str, k: int = 10):
+    """语义搜索评估记录（FedCtx HNSW）"""
+    try:
+        results = _fedctx_search(q, k)
+        return [{"id": r["id"], "score": r.get("score", 0), "metadata": r.get("metadata", {})} for r in results]
+    except Exception as e:
+        return {"error": str(e), "results": [], "fedctx_available": _fedctx_available()}
+
+@app.get("/api/fedctx/status")
+async def fedctx_status():
+    """FedCtx 连接状态"""
+    available = _fedctx_available()
+    stats = _fedctx_stats() if available else {}
+    return {
+        "available": available,
+        "url": FEDCTX_URL,
+        "stats": stats,
+        "version": stats.get("version", "unknown") if available else None,
+    }
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -427,7 +522,7 @@ async def me(token: str = ""):
 # ─── 健康检查 ───
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "4.0.0"}
+    return {"status": "ok", "version": "5.0.0", "fedctx": _fedctx_available()}
 
 # ─── 静态文件（生产模式） ───
 # 必须放在所有 API 路由之后

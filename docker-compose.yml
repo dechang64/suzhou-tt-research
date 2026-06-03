@@ -1,14 +1,30 @@
 version: "3.8"
 services:
+  fedctx:
+    image: dechang64/fedctx:latest
+    # Or build from source:
+    # build: ../unified-fl-backend
+    ports:
+      - "8090:8090"
+      - "50051:50051"
+    volumes:
+      - fedctx_data:/app/data
+    command: ["--grpc-port", "50051", "--http-port", "8090", "--data-dir", "/app/data", "--auto-persist-secs", "60"]
+    restart: unless-stopped
+
   tt-opc:
     build: .
     ports:
       - "8000:8000"
     environment:
       - JWT_SECRET=${JWT_SECRET:-tt-opc-secret-change-in-production}
+      - FEDCTX_URL=http://fedctx:8090
     volumes:
       - tt_opc_data:/app/data
+    depends_on:
+      - fedctx
     restart: unless-stopped
 
 volumes:
+  fedctx_data:
   tt_opc_data:
