@@ -1,25 +1,31 @@
-FROM python:3.12-slim
-
+# ─── Stage 1: Build frontend ───
+FROM node:20-alpine AS builder
 WORKDIR /app
-
-# Install Node.js for building frontend
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
-    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy and install Python deps
-COPY backend/requirements.txt /app/backend/
-RUN pip install --no-cache-dir -r backend/requirements.txt
-
-# Copy and build frontend
-COPY package.json package-lock.json /app/
+COPY package*.json ./
 RUN npm ci
-COPY . /app/
+COPY . .
 RUN npm run build
 
-# Expose port
+# ─── Stage 2: Production ───
+FROM python:3.12-slim
+WORKDIR /app
+
+# Install uvicorn
+RUN pip install --no-cache-dir uvicorn[standard] fastapi
+
+# Copy built frontend
+COPY --from=builder /app/dist ./dist
+
+# Copy backend
+COPY backend/server.py ./backend/
+
+# Create data directory
+RUN mkdir -p ./data
+
+# Environment
+ENV JWT_SECRET=change-me-in-production
+ENV PYTHONPATH=/app
+
 EXPOSE 8000
 
-# Start server
-CMD ["python3", "-c", "import sys; sys.path.insert(0, '.'); from backend.server import app; import uvicorn; uvicorn.run(app, host='0.0.0.0', port=8000)"]
+CMD ["uvicorn", "backend.server:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

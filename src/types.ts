@@ -7,7 +7,7 @@ export interface BlindBoxResult {
   target_customers: string; competition_level: string; time_to_market: string;
   risk_level: string; strengths: string[]; weaknesses: string[];
   opportunities: string[]; threats: string[]; suggestion: string;
-  raw?: string;
+  source?: string; raw?: string;
 }
 
 export interface TripleHelixResult {
@@ -22,7 +22,7 @@ export interface HWEvalResult {
   algorithm_fit: { score: number; bottleneck: string; optimization: string };
   bom_cost: { estimate: string; breakdown: Record<string, string> };
   localization_rate: number; risk_level: string; suggestion: string;
-  raw?: string;
+  source?: string; raw?: string;
 }
 
 export interface QuadHelixResult {
@@ -35,4 +35,18 @@ export interface QuadHelixResult {
 export interface ModuleInfo {
   id: string; name: string; nameEn: string; icon: string;
   theory: string; desc: string; color: string;
+}
+
+export interface MapProvince {
+  name: string; value: number; patents: number; transfers: number;
+  institutes: number; coord: [number, number];
+}
+
+export interface AuthState {
+  token: string; username: string; role: string;
+}
+
+export interface EvaluationRecord {
+  id: number; type: string; input: Record<string,unknown>;
+  result: Record<string,unknown>; source: string; created_at: string;
 }

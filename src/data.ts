@@ -40,25 +40,25 @@ export const BOTTLENECKS = [
 ]
 
 export const TT_MODULES: ModuleInfo[] = [
-  { id: 'blindbox', name: '盲盒评估', nameEn: 'TechBlindBox', icon: '📦', theory: 'Arrow信息悖论', desc: '不泄露技术就能评估价值——解决技术买卖中的核心矛盾', color: '#ef4444' },
-  { id: 'fedmatch', name: '联邦匹配', nameEn: 'FedMatch', icon: '🔗', theory: '联邦学习经济学', desc: '跨校专利数据不出校就能匹配需求方', color: '#8b5cf6' },
-  { id: 'knowledge', name: '知识图谱', nameEn: 'KnowledgeFlow', icon: '🌐', theory: '内生增长理论', desc: '可视化知识从论文到产品的流动路径', color: '#3b82f6' },
-  { id: 'radar', name: '技术雷达', nameEn: 'TechRadar', icon: '📡', theory: '创造性破坏', desc: '预测技术生命周期和替代时机', color: '#10b981' },
-  { id: 'translator', name: '场景翻译', nameEn: 'TechTranslator', icon: '🔄', theory: '吸收能力理论', desc: '一键生成投资人/CEO/院长版技术描述', color: '#ec4899' },
-  { id: 'triple', name: '三角色工作台', nameEn: 'TripleHelix', icon: '🧬', theory: '三螺旋理论', desc: '教授+CEO+律师三Agent协同分析', color: '#6366f1' },
-  { id: 'social', name: '社交传播交易', nameEn: 'SocialHub', icon: '🌐', theory: '网络效应+双边市场', desc: '社交+传播+交易一体化', color: '#14b8a6' },
-  { id: 'thermo', name: '创新温度计', nameEn: 'InnovationThermo', icon: '🌡️', theory: 'GPT渗透+新质生产力', desc: '实时测量AI渗透率', color: '#f59e0b' },
+  { id: 'tt-blindbox', name: '盲盒评估', nameEn: 'TechBlindBox', icon: '📦', theory: 'Arrow信息悖论', desc: '不泄露技术就能评估价值——解决技术买卖中的核心矛盾', color: '#ef4444' },
+  { id: 'tt-fedmatch', name: '联邦匹配', nameEn: 'FedMatch', icon: '🔗', theory: '联邦学习经济学', desc: '跨校专利数据不出校就能匹配需求方', color: '#8b5cf6' },
+  { id: 'tt-knowledge', name: '知识图谱', nameEn: 'KnowledgeFlow', icon: '🌐', theory: '内生增长理论', desc: '可视化知识从论文到产品的流动路径', color: '#3b82f6' },
+  { id: 'tt-radar', name: '技术雷达', nameEn: 'TechRadar', icon: '📡', theory: '创造性破坏', desc: '预测技术生命周期和替代时机', color: '#10b981' },
+  { id: 'tt-translate', name: '场景翻译', nameEn: 'TechTranslator', icon: '🔄', theory: '吸收能力理论', desc: '一键生成投资人/CEO/院长版技术描述', color: '#ec4899' },
+  { id: 'tt-triple', name: '三角色工作台', nameEn: 'TripleHelix', icon: '🧬', theory: '三螺旋理论', desc: '教授+CEO+律师三Agent协同分析', color: '#6366f1' },
+  { id: 'tt-social', name: '社交传播交易', nameEn: 'SocialHub', icon: '🌐', theory: '网络效应+双边市场', desc: '社交+传播+交易一体化', color: '#14b8a6' },
+  { id: 'tt-thermo', name: '创新温度计', nameEn: 'InnovationThermo', icon: '🌡️', theory: 'GPT渗透+新质生产力', desc: '实时测量AI渗透率', color: '#f59e0b' },
 ]
 
 export const HW_MODULES: ModuleInfo[] = [
   { id: 'hw-eval', name: '硬件评估', nameEn: 'HWEval', icon: '📊', theory: '芯片Benchmark', desc: '芯片适配+BOM成本+国产化率', color: '#0984e3' },
-  { id: 'supply', name: '供应链图谱', nameEn: 'SupplyChain', icon: '🔗', theory: '产业链协同', desc: '算法→芯片→ODM→认证全链路', color: '#6c5ce7' },
+  { id: 'hw-supply', name: '供应链图谱', nameEn: 'SupplyChain', icon: '🔗', theory: '产业链协同', desc: '算法→芯片→ODM→认证全链路', color: '#6c5ce7' },
   { id: 'hw-translate', name: '硬件翻译', nameEn: 'HWTranslator', icon: '🔄', theory: '吸收能力', desc: '硬件规格书→4个专业版本', color: '#e17055' },
-  { id: 'quad', name: '四角色工作台', nameEn: 'QuadHelix', icon: '🧬', theory: '四螺旋', desc: '算法专家+硬件PM+供应链+认证', color: '#00b894' },
+  { id: 'hw-quad', name: '四角色工作台', nameEn: 'QuadHelix', icon: '🧬', theory: '四螺旋', desc: '算法专家+硬件PM+供应链+认证', color: '#00b894' },
   { id: 'hw-radar', name: '硬件雷达', nameEn: 'HWRadar', icon: '📡', theory: '技术预测', desc: '芯片路线图+国产替代进度', color: '#fdcb6e' },
-  { id: 'cert', name: '认证导航', nameEn: 'CertNav', icon: '📋', theory: '合规管理', desc: '3C/SRRC/算法备案全流程', color: '#d63031' },
-  { id: 'proto', name: '打样工坊', nameEn: 'Prototyping', icon: '🏭', theory: '敏捷开发', desc: 'EVT→DVT→PVT→MP全流程', color: '#00cec9' },
-  { id: 'social-trade', name: '社交交易', nameEn: 'SocialTrade', icon: '🌐', theory: '网络效应', desc: '硬件开发者社区+供应链对接', color: '#e84393' },
+  { id: 'hw-cert', name: '认证导航', nameEn: 'CertNav', icon: '📋', theory: '合规管理', desc: '3C/SRRC/算法备案全流程', color: '#d63031' },
+  { id: 'hw-proto', name: '打样工坊', nameEn: 'Prototyping', icon: '🏭', theory: '敏捷开发', desc: 'EVT→DVT→PVT→MP全流程', color: '#00cec9' },
+  { id: 'hw-social-trade', name: '社交交易', nameEn: 'SocialTrade', icon: '🌐', theory: '网络效应', desc: '硬件开发者社区+供应链对接', color: '#e84393' },
 ]
 
 export const RECOMMENDATIONS = [

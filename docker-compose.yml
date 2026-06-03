@@ -1,20 +1,14 @@
-version: '3.8'
+version: "3.8"
 services:
-  api:
+  tt-opc:
     build: .
     ports:
       - "8000:8000"
     environment:
-      - PYTHONUNBUFFERED=1
+      - JWT_SECRET=${JWT_SECRET:-tt-opc-secret-change-in-production}
+    volumes:
+      - tt_opc_data:/app/data
     restart: unless-stopped
 
-  # Optional: Nginx reverse proxy for production
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - api
-    restart: unless-stopped
+volumes:
+  tt_opc_data:
