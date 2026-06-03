@@ -1,43 +1,38 @@
-export interface Theory {
-  id: string
-  name: string
-  nameEn: string
-  author: string
-  year: string
-  category: 'classical' | 'modern' | 'policy' | 'regional'
-  summary: string
-  relevance: string
-  color: string
-  icon: string
+export interface Theory { id: string; name: string; nameEn: string; author: string; year: string; category: string; summary: string; relevance: string; color: string; icon: string }
+export interface Case { id: string; name: string; type: string; tags: string[]; description: string; outcomes: string[]; votes: number; featured: boolean; year: number; institution: string; icon?: string }
+export interface IntlCase { country: string; name: string; model: string; keyPoints: string[]; metrics: { label: string; value: string }[]; color: string }
+
+export interface BlindBoxResult {
+  name: string; score: number; trl: string; market_size: string;
+  target_customers: string; competition_level: string; time_to_market: string;
+  risk_level: string; strengths: string[]; weaknesses: string[];
+  opportunities: string[]; threats: string[]; suggestion: string;
+  raw?: string;
 }
 
-export interface Case {
-  id: string
-  name: string
-  type: 'industry' | 'academic' | 'policy'
-  tags: string[]
-  description: string
-  outcomes: string[]
-  votes: number
-  featured: boolean
-  year: number
-  institution: string
-  submittedBy?: string
+export interface TripleHelixResult {
+  professor: { name: string; analysis: string };
+  ceo: { name: string; analysis: string };
+  lawyer: { name: string; analysis: string };
 }
 
-export interface Mechanism {
-  id: string
-  title: string
-  description: string
-  indicators: { label: string; value: string; unit: string; status: 'good' | 'warning' | 'critical' }[]
-  icon: string
+export interface HWEvalResult {
+  name: string;
+  chip_benchmark: { recommended: string; performance: string; power: string };
+  algorithm_fit: { score: number; bottleneck: string; optimization: string };
+  bom_cost: { estimate: string; breakdown: Record<string, string> };
+  localization_rate: number; risk_level: string; suggestion: string;
+  raw?: string;
 }
 
-export interface IntlCase {
-  country: string
-  name: string
-  model: string
-  keyPoints: string[]
-  metrics: { label: string; value: string }[]
-  color: string
+export interface QuadHelixResult {
+  algorithm_expert: { name: string; analysis: string };
+  hw_pm: { name: string; analysis: string };
+  supply_chain: { name: string; analysis: string };
+  cert_advisor: { name: string; analysis: string };
+}
+
+export interface ModuleInfo {
+  id: string; name: string; nameEn: string; icon: string;
+  theory: string; desc: string; color: string;
 }
