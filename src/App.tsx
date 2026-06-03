@@ -50,7 +50,7 @@ function LLMSourceBadge({ source }: { source?: string }) {
 }
 
 // ─── Nav ───
-function Nav({ page, setPage, dark, setDark, auth }: { page: string; setPage: (p: string) => void; dark: boolean; setDark: (d: boolean) => void; auth: AuthState | null }) {
+function Nav({ page, setPage, dark, setDark, auth, fedctxOk }: { page: string; setPage: (p: string) => void; dark: boolean; setDark: (d: boolean) => void; auth: AuthState | null; fedctxOk: boolean | null }) {
   const [open, setOpen] = useState(false)
   const groups = [
     { label: '首页', items: [{ id: 'cover', name: '🏠 首页' }, { id: 'map', name: '🗺️ 区域热力图' }] },
@@ -69,6 +69,7 @@ function Nav({ page, setPage, dark, setDark, auth }: { page: string; setPage: (p
           </div>)}
         </div>
         <div className="topbar-right">
+          <span className="fedctx-indicator" title={fedctxOk ? 'FedCtx 已连接' : 'FedCtx 未连接'}>{fedctxOk ? '🟢' : '🔴'}</span>
           {auth && <span className="user-badge">👤 {auth.username}</span>}
           <button className="dark-toggle" onClick={() => setDark(!dark)}>{dark ? '☀️' : '🌙'}</button>
           <button className="mobile-toggle" onClick={() => setOpen(!open)}>☰</button>
@@ -120,15 +121,24 @@ function MapPage() {
 
   useEffect(() => {
     if (!chartRef.current || data.length === 0) return
-    import('echarts').then(echarts => {
+    Promise.all([import('echarts'), fetch('/china.json').then(r => r.json())]).then(([echarts, chinaJson]) => {
+      echarts.registerMap('china', chinaJson)
       const chart = echarts.init(chartRef.current!)
+      const mapData = data.map(d => ({ name: d.name, value: d.value, patents: d.patents, transfers: d.transfers, institutes: d.institutes }))
       chart.setOption({
         tooltip: { trigger: 'item', formatter: (p: any) => {
-          const d = p.data; return d ? `<b>${d.name}</b><br/>技术转移指数: ${d.value}<br/>专利数: ${(d.patents/1000).toFixed(0)}K<br/>转化数: ${d.transfers}<br/>机构数: ${d.institutes}` : ''
+          if (!p.data) return ''
+          const d = p.data
+          return `<b>${d.name}</b><br/>技术转移指数: ${d.value}<br/>专利数: ${(d.patents/1000).toFixed(0)}K<br/>转化数: ${d.transfers}<br/>机构数: ${d.institutes}`
         }},
-        visualMap: { min: 0, max: 100, left: 20, bottom: 20, text: ['高', '低'], inRange: { color: ['#e0f2fe', '#0284c7'] }, calculable: true },
-        geo: { map: 'china', roam: true, label: { show: true, fontSize: 9, color: '#666' }, itemStyle: { areaColor: '#f0f4f8', borderColor: '#ccc' }, emphasis: { itemStyle: { areaColor: '#bfdbfe' } } },
-        series: [{ type: 'scatter', coordinateSystem: 'geo', data: data.map(d => ({ name: d.name, value: [...d.coord, d.value], ...d })), symbolSize: (val: number[]) => Math.max(val[2] / 4, 8), itemStyle: { color: '#0284c7' }, emphasis: { itemStyle: { color: '#dc2626' } } }]
+        visualMap: { min: 0, max: 100, left: 20, bottom: 20, text: ['高', '低'], inRange: { color: ['#e0f2fe', '#7dd3fc', '#0284c7', '#075985'] }, calculable: true },
+        series: [{
+          type: 'map', map: 'china', roam: true,
+          label: { show: true, fontSize: 9, color: '#333' },
+          itemStyle: { areaColor: '#f0f4f8', borderColor: '#94a3b8', borderWidth: 0.5 },
+          emphasis: { label: { color: '#fff' }, itemStyle: { areaColor: '#0284c7', borderColor: '#075985' } },
+          data: mapData
+        }]
       })
       chart.on('click', (p: any) => { const prov = data.find(d => d.name === p.name); if (prov) setSelected(prov) })
       const onResize = () => chart.resize(); window.addEventListener('resize', onResize)
@@ -483,22 +493,47 @@ function StaticModule({ name, nameEn, icon, theory, desc, color }: { id: string;
 
 // ─── History Page ───
 function HistoryPage() {
-  const [records, setRecords] = useState<EvaluationRecord[]>([])
-  const [loading, setLoading] = useState(true)
+  const [records, setRecords] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [query, setQuery] = useState('')
+  const [fedctxStatus, setFedctxStatus] = useState<{available: boolean; total: number} | null>(null)
+
   useEffect(() => {
-    apiGet<EvaluationRecord[]>('/api/evaluations?limit=50').then(r => { setRecords(r); setLoading(false) }).catch(() => setLoading(false))
+    apiGet<any>('/api/fedctx/status').then(d => setFedctxStatus({ available: d.available, total: d.total_vectors || d.stats?.total_vectors || 0 })).catch(() => {})
   }, [])
+
+  const handleSearch = useCallback(async () => {
+    if (!query.trim()) return
+    setLoading(true)
+    try {
+      const r = await apiGet<any[]>(`/api/evaluations/search?q=${encodeURIComponent(query)}&k=20`)
+      setRecords(Array.isArray(r) ? r : [])
+    } catch { setRecords([]) }
+    setLoading(false)
+  }, [query])
+
   return (
     <div className="page-content">
       <div className="module-header" style={{ background: 'linear-gradient(135deg, #636e72 0%, #2d3436 100%)' }}>
         <h1>📋 评估历史</h1>
-        <p>所有评估记录 · SQLite持久化存储</p>
+        <p>FedCtx HNSW 语义检索 · 输入自然语言搜索相似评估</p>
+        {fedctxStatus && <span style={{ float: 'right', fontSize: '0.8rem', opacity: 0.8 }}>
+          {fedctxStatus.available ? `🟢 FedCtx 已连接 (${fedctxStatus.total} 条记录)` : '🔴 FedCtx 未连接'}
+        </span>}
       </div>
-      {loading ? <Spinner /> : records.length === 0 ? <div className="card"><p>暂无评估记录。完成一次评估后，记录将自动保存。</p></div> :
-        <div>{records.map(r => <div key={r.id} className="card" style={{ marginBottom: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>#{r.id} · {r.type}</span><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{r.created_at}</span></div>
-          <LLMSourceBadge source={r.source} />
-        </div>)}</div>}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="语义搜索：如'量子计算相关项目'、'AI芯片评估'" className="form-input" style={{ flex: 1 }} onKeyDown={e => e.key === 'Enter' && handleSearch()} />
+        <button onClick={handleSearch} className="btn-primary" disabled={loading}>🔍 搜索</button>
+      </div>
+      {loading ? <Spinner /> : records.length === 0 ? <div className="card"><p>输入关键词搜索评估记录。FedCtx HNSW 引擎会返回语义最相似的结果。</p></div> :
+        <div>{records.map((r, i) => <div key={r.id || i} className="card" style={{ marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>{r.id} · {r.metadata?.type || r.metadata?.tech_name || '未知'}</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>相似度: {(r.score * 100).toFixed(1)}%</span>
+          </div>
+          {r.metadata?.tech_name && <div style={{ marginTop: 4 }}>技术: {r.metadata.tech_name} {r.metadata.score && `| 评分: ${r.metadata.score}`}</div>
+          }</div>)}</div>
+      }
     </div>
   )
 }
@@ -509,7 +544,7 @@ function IntlPage() { return <div className="page-content"><div className="modul
 
 // ─── Footer ───
 function Footer() {
-  return <div className="footer"><p>TT-OPC 智能运营平台 v4.0 · 基于24个经济学理论设计</p><p>西交利物浦大学 · 徐德昌教授课题组 · GitHub: dechang64</p></div>
+  return <div className="footer"><p>TT-OPC 智能运营平台 v5.0 · FedCtx HNSW + 24个经济学理论</p><p>西交利物浦大学 · 徐德昌教授课题组 · GitHub: dechang64</p></div>
 }
 
 // ─── App ───
@@ -517,6 +552,15 @@ export default function App() {
   const [page, setPage] = useState('cover')
   const [dark, setDark] = useState(false)
   const [auth, setAuth] = useState<AuthState | null>(null)
+  const [fedctxOk, setFedctxOk] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    apiGet<{fedctx: boolean}>('/api/health').then(d => setFedctxOk(d.fedctx)).catch(() => setFedctxOk(false))
+    const iv = setInterval(() => {
+      apiGet<{fedctx: boolean}>('/api/health').then(d => setFedctxOk(d.fedctx)).catch(() => setFedctxOk(false))
+    }, 30000)
+    return () => clearInterval(iv)
+  }, [])
 
   const pageMap: Record<string, React.ReactElement> = {
     cover: <CoverPage setPage={setPage} />,
@@ -544,7 +588,7 @@ export default function App() {
 
   return (
     <div className={`app ${dark ? 'dark' : ''}`}>
-      <Nav page={page} setPage={setPage} dark={dark} setDark={setDark} auth={auth} />
+      <Nav page={page} setPage={setPage} dark={dark} setDark={setDark} auth={auth} fedctxOk={fedctxOk} />
       {pageMap[page] ?? pageMap.cover}
       <Footer />
     </div>

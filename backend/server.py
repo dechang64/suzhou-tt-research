@@ -448,6 +448,7 @@ async def fedctx_status():
         "available": available,
         "url": FEDCTX_URL,
         "stats": stats,
+        "total_vectors": stats.get("total_vectors", 0),
         "version": stats.get("version", "unknown") if available else None,
     }
 
