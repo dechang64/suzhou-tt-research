@@ -3,7 +3,7 @@
 """
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
@@ -30,8 +30,8 @@ def _llm_sync(system_prompt: str, user_prompt: str) -> Optional[str]:
         )
         if result.returncode == 0:
             output = result.stdout.strip()
-            lines = [l for l in output.split('\n') if l.strip() and not l.startswith('🚀')]
-            return '\n'.join(lines) or None
+            lines = [l for l in output.split("\n") if l.strip() and not l.startswith("\U0001f680")]
+            return "\n".join(lines) or None
     except:
         pass
     return None
@@ -58,7 +58,7 @@ class AIEnhanceRequest(BaseModel):
     content: str
 
 
-# ─── 盲盒评估（即时返回 fallback） ───
+# ─── 盲盒评估 ───
 @app.post("/api/blindbox")
 async def blindbox(req: BlindBoxRequest):
     return {
@@ -73,8 +73,7 @@ async def blindbox(req: BlindBoxRequest):
         "source": "fallback"
     }
 
-
-# ─── 场景翻译（即时返回 fallback） ───
+# ─── 场景翻译 ───
 @app.post("/api/tech-translate")
 async def tech_translate(req: TechTranslateRequest):
     fallbacks = {
@@ -84,8 +83,7 @@ async def tech_translate(req: TechTranslateRequest):
     }
     return {ver: fallbacks.get(ver, f"（{ver}版本生成中）") for ver in req.versions}
 
-
-# ─── 三角色工作台（即时返回 fallback） ───
+# ─── 三角色工作台 ───
 @app.post("/api/triple-helix")
 async def triple_helix(req: TripleHelixRequest):
     return {
@@ -94,8 +92,7 @@ async def triple_helix(req: TripleHelixRequest):
         "lawyer": {"name": "律师", "analysis": f"【{req.project_name}】知识产权归属需明确，建议先申请核心专利再启动转化。合同设计注意技术秘密保护条款，NDA模板已备。"},
     }
 
-
-# ─── 硬件评估（即时返回 fallback） ───
+# ─── 硬件评估 ───
 @app.post("/api/hw-eval")
 async def hw_eval(req: HWEvalRequest):
     return {
@@ -108,8 +105,7 @@ async def hw_eval(req: HWEvalRequest):
         "source": "fallback"
     }
 
-
-# ─── 硬件翻译（即时返回 fallback） ───
+# ─── 硬件翻译 ───
 @app.post("/api/hw-translate")
 async def hw_translate(req: HWTranslateRequest):
     fallbacks = {
@@ -120,8 +116,7 @@ async def hw_translate(req: HWTranslateRequest):
     }
     return {ver: fallbacks.get(ver, f"（{ver}版本生成中）") for ver in req.versions}
 
-
-# ─── 四角色工作台（即时返回 fallback） ───
+# ─── 四角色工作台 ───
 @app.post("/api/quad-helix")
 async def quad_helix(req: QuadHelixRequest):
     return {
@@ -131,45 +126,35 @@ async def quad_helix(req: QuadHelixRequest):
         "cert_advisor": {"name": "认证顾问", "analysis": f"【{req.project_name}】3C认证+SRRC+算法备案三证并行，总周期4-6个月。费用预估8-15万。"},
     }
 
-
 # ─── 社交内容 AI 优化 ───
 @app.post("/api/ai-enhance")
 async def ai_enhance(req: AIEnhanceRequest):
-    return {"enhanced": req.content + " #技术转移 #OPC #AI赋能 🚀"}
-
-
-# ─── LLM 增强端点（SSE，可选调用） ───
-@app.post("/api/llm/blindbox")
-async def llm_blindbox(req: BlindBoxRequest):
-    """LLM增强版盲盒评估（SSE流式返回）"""
-    async def generate():
-        system = """你是技术转移评估专家。生成盲盒评估JSON：
-{"name":"技术名称","score":85,"trl":"TRL4","market_size":"10-50亿","target_customers":"目标客户","competition_level":"中等","time_to_market":"1-2年","risk_level":"中等","strengths":["优势1","优势2","优势3"],"weaknesses":["劣势1","劣势2"],"opportunities":["机会1","机会2","机会3"],"threats":["威胁1","威胁2"],"suggestion":"转化建议"}
-只返回JSON。"""
-        raw = await llm_chat(system, f"技术名称：{req.tech_name}\n领域：{req.tech_field}\n描述：{req.tech_description}\n成熟度：{req.trl_level}")
-        if raw:
-            try:
-                json_match = re.search(r'\{[\s\S]*\}', raw)
-                if json_match:
-                    data = json.loads(json_match.group())
-                    yield f"event: result\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
-                    return
-            except:
-                pass
-            yield f"event: result\ndata: {json.dumps({'raw': raw}, ensure_ascii=False)}\n\n"
-    return StreamingResponse(generate(), media_type="text/event-stream")
-
+    return {"enhanced": req.content + " #技术转移 #OPC #AI赋能"}
 
 # ─── 健康检查 ───
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "version": "3.0.0"}
 
-
 # ─── 静态文件（生产模式） ───
-dist_path = os.path.join(os.path.dirname(__file__), "..", "dist")
-if os.path.isdir(dist_path):
-    app.mount("/", StaticFiles(directory=dist_path, html=True), name="static")
+# 必须放在所有 API 路由之后
+DIST = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "dist"))
+
+@app.get("/")
+async def serve_index():
+    return FileResponse(os.path.join(DIST, "index.html"))
+
+@app.get("/favicon.svg")
+async def serve_favicon():
+    return FileResponse(os.path.join(DIST, "favicon.svg"))
+
+@app.get("/icons.svg")
+async def serve_icons():
+    return FileResponse(os.path.join(DIST, "icons.svg"))
+
+# Mount assets last
+if os.path.isdir(os.path.join(DIST, "assets")):
+    app.mount("/assets", StaticFiles(directory=os.path.join(DIST, "assets")), name="assets")
 
 
 if __name__ == "__main__":
