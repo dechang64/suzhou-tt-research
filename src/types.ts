@@ -91,3 +91,57 @@ export interface InnovationThermoResult {
     key_apps: string[]; patents: number; growth: string;
   }>;
 }
+
+export interface HWRadarResult {
+  source: string;
+  categories: Array<{
+    category: string;
+    chips: Array<{
+      name: string; vendor: string; local: boolean; maturity: number;
+      sub_progress: string; next_gen: string; advantage: string;
+    }>;
+  }>;
+}
+
+export interface CertNavResult {
+  product: string; type: string;
+  required_certs: Array<{
+    name: string; full_name: string; required: boolean;
+    duration: string; cost: string; steps: string[];
+    tips: string; agencies: string[];
+  }>;
+  optional_certs: Array<{
+    name: string; full_name: string; required: boolean;
+    duration: string; cost: string; steps: string[];
+    tips: string; agencies: string[];
+  }>;
+  parallel_timeline: string; total_cost: string;
+}
+
+export interface PrototypingResult {
+  product: string;
+  stages: Array<{
+    stage: string; name: string; duration: string;
+    goals: string[]; deliverables: string[];
+    risks: string[]; gate: string;
+  }>;
+  total_duration: string; key_milestones: string[];
+}
+
+export interface SocialHubResult {
+  query: string;
+  results: Array<{
+    id: string; type: string; title: string; org: string;
+    tags: string[]; match_score?: number;
+    trl?: string; budget?: string; contact?: string;
+  }>;
+  pairs: Array<{
+    supply: string; demand: string;
+    common_tags: string[]; match_strength: number;
+  }>;
+}
+
+export interface SocialTradeResult {
+  query: string;
+  results: Array<Record<string, unknown>>;
+}

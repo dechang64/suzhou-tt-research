@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import './App.css'
 import { TT_MODULES, HW_MODULES, API_BASE } from './data'
-import type { BlindBoxResult, TripleHelixResult, HWEvalResult, QuadHelixResult, MapProvince, AuthState, FedMatchResult, KGResult, SupplyChainResult, TechRadarResult, InnovationThermoResult } from './types'
+import type { BlindBoxResult, TripleHelixResult, HWEvalResult, QuadHelixResult, MapProvince, AuthState, FedMatchResult, KGResult, SupplyChainResult, TechRadarResult, InnovationThermoResult, HWRadarResult, CertNavResult, PrototypingResult, SocialHubResult, SocialTradeResult } from './types'
 
 // ─── API helpers ───
 async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
@@ -944,14 +944,340 @@ function InnovationThermoPage() {
   )
 }
 
-function StaticModule({ name, nameEn, icon, theory, desc, color }: { id: string; name: string; nameEn: string; icon: string; theory: string; desc: string; color: string }) {
+// ─── HWRadar Page (硬件雷达) ───
+function HWRadarPage() {
+  const [data, setData] = useState<HWRadarResult | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [llmLoading, setLlmLoading] = useState(false)
+  const [llmAnalysis, setLlmAnalysis] = useState('')
+
+  useEffect(() => { apiGet<HWRadarResult>('/api/hw-radar').then(d => setData(d)).catch(() => {}).finally(() => setLoading(false)) }, [])
+
+  const handleLLM = useCallback(() => {
+    setLlmLoading(true); setLlmAnalysis('')
+    streamSSE('/api/llm/hw-radar', {}, (evt, d) => { if (evt === 'result' && d.analysis) { setLlmAnalysis(d.analysis); setLlmLoading(false) } })
+    setTimeout(() => setLlmLoading(false), 60000)
+  }, [])
+
   return (
     <div className="page-content">
-      <div className="module-header" style={{ background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)` }}>
-        <h1>{icon} {name}</h1>
-        <p>{nameEn} · {theory}</p>
+      <div className="module-header" style={{ background: 'linear-gradient(135deg, #fdcb6e 0%, #f39c12 100%)' }}>
+        <h1>📡 硬件雷达 HWRadar</h1>
+        <p>芯片路线图+国产替代进度 · 技术预测</p>
+        {llmLoading && <span className="llm-loading-header">🤖 AI分析中...</span>}
       </div>
-      <div className="card"><p>{desc}</p><p style={{ marginTop: 12, color: 'var(--text-muted)' }}>🚧 该模块的交互功能正在开发中，敬请期待！</p></div>
+      {loading && <div className="card"><Spinner /> 加载中...</div>}
+      {data && data.categories.map(cat => (
+        <div key={cat.category} style={{ marginTop: 12 }}>
+          <h3 style={{ marginBottom: 8 }}>{cat.category}</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8 }}>
+            {cat.chips.map(chip => (
+              <div key={chip.name} className="card" style={{ borderLeft: `4px solid ${chip.local ? '#10b981' : '#ef4444'}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <h4>{chip.name} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{chip.vendor}</span></h4>
+                  <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: 4, background: chip.local ? '#d1fae5' : '#fee2e2', color: chip.local ? '#065f46' : '#991b1b' }}>{chip.local ? '国产' : '进口'}</span>
+                </div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: 4 }}>{chip.advantage}</div>
+                <div style={{ marginTop: 6, height: 4, borderRadius: 2, background: 'var(--border)' }}>
+                  <div style={{ height: '100%', width: `${chip.maturity * 100}%`, background: chip.local ? '#10b981' : '#f59e0b', borderRadius: 2 }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  <span>成熟度 {(chip.maturity * 100).toFixed(0)}%</span>
+                  <span>{chip.sub_progress}</span>
+                </div>
+                <div style={{ fontSize: '0.8rem', marginTop: 4 }}>🔄 下一代: {chip.next_gen}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      <button className="btn-secondary" style={{ marginTop: 12 }} onClick={handleLLM} disabled={llmLoading}>{llmLoading ? <Spinner /> : '🤖 AI 选型建议'}</button>
+      {llmAnalysis && <div className="card" style={{ marginTop: 12, borderLeft: '4px solid #f39c12' }}><h4>🤖 AI 选型建议</h4><p style={{ whiteSpace: 'pre-wrap' }}>{llmAnalysis}</p></div>}
+    </div>
+  )
+}
+
+// ─── CertNav Page (认证导航) ───
+function CertNavPage() {
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<CertNavResult | null>(null)
+  const [error, setError] = useState('')
+  const [llmLoading, setLlmLoading] = useState(false)
+  const [llmAnalysis, setLlmAnalysis] = useState('')
+
+  const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault(); setLoading(true); setError(''); setResult(null); setLlmAnalysis('')
+    const fd = new FormData(e.currentTarget)
+    const body = { product_name: fd.get('product_name'), product_type: fd.get('product_type') || '智能硬件' }
+    try {
+      const r = await apiPost<CertNavResult>('/api/cert-nav', body)
+      setResult(r); setLoading(false)
+      setLlmLoading(true)
+      streamSSE('/api/llm/cert-nav', body, (evt, d) => { if (evt === 'result' && d.analysis) { setLlmAnalysis(d.analysis); setLlmLoading(false) } })
+      setTimeout(() => setLlmLoading(false), 60000)
+    } catch (err: unknown) { setError(err instanceof Error ? err.message : '请求失败') }
+    finally { setLoading(false) }
+  }, [])
+
+  return (
+    <div className="page-content">
+      <div className="module-header" style={{ background: 'linear-gradient(135deg, #d63031 0%, #c0392b 100%)' }}>
+        <h1>📋 认证导航 CertNav</h1>
+        <p>3C/SRRC/算法备案全流程 · 合规管理</p>
+        {llmLoading && <span className="llm-loading-header">🤖 AI分析中...</span>}
+      </div>
+      <form onSubmit={handleSubmit} className="eval-form">
+        <input name="product_name" placeholder="产品名称 *" required className="form-input" />
+        <select name="product_type" className="form-input">
+          <option value="智能硬件">智能硬件</option><option value="AI设备">AI设备</option>
+          <option value="通信设备">通信设备</option><option value="医疗器械">医疗器械</option>
+        </select>
+        <button type="submit" className="btn-primary" disabled={loading}>{loading ? <Spinner /> : '📋 查询认证路径'}</button>
+      </form>
+      {error && <div className="error-card">{error}</div>}
+      {result && <>
+        <div className="card" style={{ textAlign: 'center', marginBottom: 12 }}>
+          <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>⏱️ {result.parallel_timeline}</div>
+          <div style={{ color: 'var(--text-muted)' }}>总费用: {result.total_cost}</div>
+        </div>
+        <h3>✅ 必须认证</h3>
+        {result.required_certs.map(cert => (
+          <div key={cert.name} className="card" style={{ borderLeft: '4px solid #d63031', marginTop: 8 }}>
+            <h4>{cert.name} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{cert.full_name}</span></h4>
+            <div style={{ display: 'flex', gap: 12, marginTop: 4, fontSize: '0.85rem' }}>
+              <span>⏱️ {cert.duration}</span><span>💰 {cert.cost}</span>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <strong>流程：</strong>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                {cert.steps.map((s, i) => <span key={i} style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: 4, background: 'var(--accent-bg)', color: 'var(--accent)' }}>{i + 1}. {s}</span>)}
+              </div>
+            </div>
+            <div style={{ marginTop: 6, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>💡 {cert.tips}</div>
+            <div style={{ marginTop: 4, fontSize: '0.8rem', color: 'var(--text-muted)' }}>机构：{cert.agencies.join('、')}</div>
+          </div>
+        ))}
+        {result.optional_certs.length > 0 && <><h3 style={{ marginTop: 16 }}>🌍 出口认证（可选）</h3>
+        {result.optional_certs.map(cert => (
+          <div key={cert.name} className="card" style={{ borderLeft: '4px solid #3b82f6', marginTop: 8 }}>
+            <h4>{cert.name} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{cert.full_name}</span></h4>
+            <div style={{ display: 'flex', gap: 12, fontSize: '0.85rem' }}><span>⏱️ {cert.duration}</span><span>💰 {cert.cost}</span></div>
+          </div>
+        ))}</>}
+      </>}
+      {llmAnalysis && <div className="card" style={{ marginTop: 12, borderLeft: '4px solid #d63031' }}><h4>🤖 AI 认证策略</h4><p style={{ whiteSpace: 'pre-wrap' }}>{llmAnalysis}</p></div>}
+    </div>
+  )
+}
+
+// ─── Prototyping Page (打样工坊) ───
+function PrototypingPage() {
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<PrototypingResult | null>(null)
+  const [error, setError] = useState('')
+  const [llmLoading, setLlmLoading] = useState(false)
+  const [llmAnalysis, setLlmAnalysis] = useState('')
+
+  const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault(); setLoading(true); setError(''); setResult(null); setLlmAnalysis('')
+    const fd = new FormData(e.currentTarget)
+    const body = { product_name: fd.get('product_name'), product_description: fd.get('product_description') || '' }
+    try {
+      const r = await apiPost<PrototypingResult>('/api/prototyping', body)
+      setResult(r); setLoading(false)
+      setLlmLoading(true)
+      streamSSE('/api/llm/prototyping', body, (evt, d) => { if (evt === 'result' && d.analysis) { setLlmAnalysis(d.analysis); setLlmLoading(false) } })
+      setTimeout(() => setLlmLoading(false), 60000)
+    } catch (err: unknown) { setError(err instanceof Error ? err.message : '请求失败') }
+    finally { setLoading(false) }
+  }, [])
+
+  const stageColors: Record<string, string> = { EVT: '#3b82f6', DVT: '#f59e0b', PVT: '#10b981', MP: '#8b5cf6' }
+
+  return (
+    <div className="page-content">
+      <div className="module-header" style={{ background: 'linear-gradient(135deg, #00cec9 0%, #00b894 100%)' }}>
+        <h1>🏭 打样工坊 Prototyping</h1>
+        <p>EVT→DVT→PVT→MP全流程 · 敏捷开发</p>
+        {llmLoading && <span className="llm-loading-header">🤖 AI分析中...</span>}
+      </div>
+      <form onSubmit={handleSubmit} className="eval-form">
+        <input name="product_name" placeholder="产品名称 *" required className="form-input" />
+        <textarea name="product_description" placeholder="产品描述（可选）" rows={2} className="form-input" />
+        <button type="submit" className="btn-primary" disabled={loading}>{loading ? <Spinner /> : '🏭 生成打样计划'}</button>
+      </form>
+      {error && <div className="error-card">{error}</div>}
+      {result && <>
+        <div className="card" style={{ textAlign: 'center', marginBottom: 12 }}>
+          <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>⏱️ {result.total_duration}</div>
+        </div>
+        {/* Timeline */}
+        <div style={{ display: 'flex', gap: 0, overflowX: 'auto', marginTop: 12 }}>
+          {result.stages.map((stage) => (
+            <div key={stage.stage} style={{ flex: 1, minWidth: 200 }}>
+              <div style={{ background: stageColors[stage.stage], color: '#fff', padding: '8px 12px', textAlign: 'center', fontWeight: 700 }}>
+                {stage.stage} · {stage.name}
+              </div>
+              <div style={{ padding: 12, background: 'var(--card)', border: '1px solid var(--border)', borderTop: 0 }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 4 }}>⏱️ {stage.duration}</div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: 4 }}>目标</div>
+                {stage.goals.map(g => <div key={g} style={{ fontSize: '0.8rem', paddingLeft: 8 }}>• {g}</div>)}
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, marginTop: 8, marginBottom: 4 }}>交付物</div>
+                {stage.deliverables.map(d => <div key={d} style={{ fontSize: '0.8rem', paddingLeft: 8 }}>📦 {d}</div>)}
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, marginTop: 8, marginBottom: 4 }}>风险</div>
+                {stage.risks.map(r => <div key={r} style={{ fontSize: '0.8rem', paddingLeft: 8, color: '#ef4444' }}>⚠️ {r}</div>)}
+                <div style={{ marginTop: 8, padding: '4px 8px', borderRadius: 4, background: `${stageColors[stage.stage]}15`, fontSize: '0.8rem', color: stageColors[stage.stage] }}>
+                  🚪 Gate: {stage.gate}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </>}
+      {llmAnalysis && <div className="card" style={{ marginTop: 12, borderLeft: '4px solid #00cec9' }}><h4>🤖 AI 打样建议</h4><p style={{ whiteSpace: 'pre-wrap' }}>{llmAnalysis}</p></div>}
+    </div>
+  )
+}
+
+// ─── SocialHub Page (社交传播交易) ───
+function SocialHubPage() {
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<SocialHubResult | null>(null)
+  const [error, setError] = useState('')
+  const [llmLoading, setLlmLoading] = useState(false)
+  const [llmAnalysis, setLlmAnalysis] = useState('')
+
+  const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault(); setLoading(true); setError(''); setResult(null); setLlmAnalysis('')
+    const fd = new FormData(e.currentTarget)
+    const body = { query: fd.get('query'), role: fd.get('role') || 'all' }
+    try {
+      const r = await apiPost<SocialHubResult>('/api/social-hub', body)
+      setResult(r); setLoading(false)
+      setLlmLoading(true)
+      streamSSE('/api/llm/social-hub', body, (evt, d) => { if (evt === 'result' && d.analysis) { setLlmAnalysis(d.analysis); setLlmLoading(false) } })
+      setTimeout(() => setLlmLoading(false), 60000)
+    } catch (err: unknown) { setError(err instanceof Error ? err.message : '请求失败') }
+    finally { setLoading(false) }
+  }, [])
+
+  return (
+    <div className="page-content">
+      <div className="module-header" style={{ background: 'linear-gradient(135deg, #e84393 0%, #d63384 100%)' }}>
+        <h1>🌐 社交传播交易 SocialHub</h1>
+        <p>社交+传播+交易一体化 · 网络效应+双边市场</p>
+        {llmLoading && <span className="llm-loading-header">🤖 AI撮合中...</span>}
+      </div>
+      <form onSubmit={handleSubmit} className="eval-form">
+        <input name="query" placeholder="搜索技术需求或供给（如：联邦学习 质检）*" required className="form-input" />
+        <select name="role" className="form-input">
+          <option value="all">全部</option><option value="supply">技术供给</option><option value="demand">技术需求</option>
+        </select>
+        <button type="submit" className="btn-primary" disabled={loading}>{loading ? <Spinner /> : '🔍 搜索匹配'}</button>
+      </form>
+      {error && <div className="error-card">{error}</div>}
+      {result && <>
+        {result.pairs.length > 0 && <div style={{ marginTop: 12 }}>
+          <h3>🤝 撮合推荐</h3>
+          {result.pairs.map((p, i) => (
+            <div key={i} className="card" style={{ borderLeft: '4px solid #10b981', marginTop: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ padding: '2px 8px', borderRadius: 4, background: '#dbeafe', color: '#1e40af', fontSize: '0.85rem' }}>📤 {p.supply}</span>
+                <span>↔️</span>
+                <span style={{ padding: '2px 8px', borderRadius: 4, background: '#fef3c7', color: '#92400e', fontSize: '0.85rem' }}>📥 {p.demand}</span>
+              </div>
+              <div style={{ marginTop: 4, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                匹配标签：{p.common_tags.join('、')} · 强度：{(p.match_strength * 100).toFixed(0)}%
+              </div>
+            </div>
+          ))}
+        </div>}
+        <div style={{ marginTop: 12 }}>
+          <h3>📋 搜索结果 ({result.results.length})</h3>
+          {result.results.map(r => (
+            <div key={r.id} className="card" style={{ borderLeft: `4px solid ${r.type === 'supply' ? '#3b82f6' : '#f59e0b'}`, marginTop: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <h4>{r.type === 'supply' ? '📤' : '📥'} {r.title}</h4>
+                <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: 4, background: r.type === 'supply' ? '#dbeafe' : '#fef3c7', color: r.type === 'supply' ? '#1e40af' : '#92400e' }}>{r.type === 'supply' ? '供给' : '需求'}</span>
+              </div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: 4 }}>🏛️ {r.org} {r.trl && `· ${r.trl}`} {r.budget && `· 💰 ${r.budget}`}</div>
+              <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>{r.tags.map(t => <span key={t} style={{ fontSize: '0.75rem', padding: '1px 6px', borderRadius: 3, background: 'var(--bg)', color: 'var(--text-secondary)' }}>#{t}</span>)}</div>
+            </div>
+          ))}
+        </div>
+      </>}
+      {llmAnalysis && <div className="card" style={{ marginTop: 12, borderLeft: '4px solid #e84393' }}><h4>🤖 AI 撮合建议</h4><p style={{ whiteSpace: 'pre-wrap' }}>{llmAnalysis}</p></div>}
+    </div>
+  )
+}
+
+// ─── SocialTrade Page (硬件社交交易) ───
+function SocialTradePage() {
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<SocialTradeResult | null>(null)
+  const [llmLoading, setLlmLoading] = useState(false)
+  const [llmAnalysis, setLlmAnalysis] = useState('')
+
+  const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault(); setLoading(true); setResult(null); setLlmAnalysis('')
+    const fd = new FormData(e.currentTarget)
+    const body = { query: fd.get('query') || '', category: fd.get('category') || 'all' }
+    try {
+      const r = await apiPost<SocialTradeResult>('/api/social-trade', body)
+      setResult(r); setLoading(false)
+      setLlmLoading(true)
+      streamSSE('/api/llm/social-trade', body, (evt, d) => { if (evt === 'result' && d.analysis) { setLlmAnalysis(d.analysis); setLlmLoading(false) } })
+      setTimeout(() => setLlmLoading(false), 60000)
+    } catch { setResult(null) }
+    finally { setLoading(false) }
+  }, [])
+
+  const typeIcons: Record<string, string> = { developer: '👨‍💻', supplier: '🏭', cert: '📋' }
+  const typeLabels: Record<string, string> = { developer: '开发者', supplier: '供应商', cert: '认证' }
+  const typeColors: Record<string, string> = { developer: '#3b82f6', supplier: '#10b981', cert: '#f59e0b' }
+
+  return (
+    <div className="page-content">
+      <div className="module-header" style={{ background: 'linear-gradient(135deg, #e84393 0%, #c44569 100%)' }}>
+        <h1>🌐 硬件社交交易 SocialTrade</h1>
+        <p>硬件开发者社区+供应链对接+交易管理 · 供需匹配+数据看板</p>
+        {llmLoading && <span className="llm-loading-header">🤖 AI分析中...</span>}
+      </div>
+      <form onSubmit={handleSubmit} className="eval-form">
+        <input name="query" placeholder="搜索（如：RK3588 PCB 3C认证）" className="form-input" />
+        <select name="category" className="form-input">
+          <option value="all">全部</option><option value="developer">开发者</option>
+          <option value="supplier">供应商</option><option value="cert">认证服务</option>
+        </select>
+        <button type="submit" className="btn-primary" disabled={loading}>{loading ? <Spinner /> : '🔍 搜索资源'}</button>
+      </form>
+      {result && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 8, marginTop: 12 }}>
+        {result.results.map((item: Record<string, unknown>) => {
+          const t = String(item.type || '')
+          const id = String(item.id)
+          const name = String(item.name)
+          const skills = Array.isArray(item.skills) ? item.skills as string[] : []
+          const capability = item.capability ? String(item.capability) : ''
+          const service = item.service ? String(item.service) : ''
+          const projects = item.projects ? String(item.projects) : ''
+          const rating = item.rating ? String(item.rating) : ''
+          const minOrder = item.min_order ? String(item.min_order) : ''
+          const leadTime = item.lead_time ? String(item.lead_time) : ''
+          const duration = item.duration ? String(item.duration) : ''
+          const cost = item.cost ? String(item.cost) : ''
+          return <div key={id} className="card" style={{ borderLeft: `4px solid ${typeColors[t] || '#6b7280'}` }}>
+            <h4>{typeIcons[t] || '📄'} {name}</h4>
+            <div style={{ fontSize: '0.8rem', padding: '2px 6px', borderRadius: 4, background: `${typeColors[t] || '#6b7280'}20`, color: typeColors[t] || '#6b7280', display: 'inline-block', marginTop: 4 }}>{typeLabels[t] || t}</div>
+            {skills.length > 0 && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>{skills.map(s => <span key={s} style={{ fontSize: '0.75rem', padding: '1px 6px', borderRadius: 3, background: 'var(--bg)', color: 'var(--text-secondary)' }}>{s}</span>)}</div>}
+            {capability && <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: 4 }}>🔧 {capability}</div>}
+            {service && <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: 4 }}>📋 {service}</div>}
+            {(projects || rating) && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>项目: {projects || '-'} · ⭐ {rating || '-'}</div>}
+            {(minOrder || leadTime) && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>起订: {minOrder || '-'} · 交期: {leadTime || '-'}</div>}
+            {(duration || cost) && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>周期: {duration || '-'} · 费用: {cost || '-'}</div>}
+          </div>
+        })}
+      </div>}
+      {llmAnalysis && <div className="card" style={{ marginTop: 12, borderLeft: '4px solid #e84393' }}><h4>🤖 AI 对接建议</h4><p style={{ whiteSpace: 'pre-wrap' }}>{llmAnalysis}</p></div>}
     </div>
   )
 }
@@ -1036,16 +1362,16 @@ export default function App() {
     'tt-radar': <TechRadarPage />,
     'tt-translate': <TechTranslatorPage />,
     'tt-triple': <TripleHelixPage />,
-    'tt-social': <StaticModule {...TT_MODULES[6]} id="tt-social" />,
+    'tt-social': <SocialHubPage />,
     'tt-thermo': <InnovationThermoPage />,
     'hw-eval': <HWEvalPage />,
     'hw-translate': <HWTranslatorPage />,
     'hw-quad': <QuadHelixPage />,
     'hw-supply': <SupplyChainPage />,
-    'hw-radar': <StaticModule {...HW_MODULES[4]} id="hw-radar" />,
-    'hw-cert': <StaticModule {...HW_MODULES[5]} id="hw-cert" />,
-    'hw-proto': <StaticModule {...HW_MODULES[6]} id="hw-proto" />,
-    'hw-social-trade': <StaticModule {...HW_MODULES[7]} id="hw-social-trade" />,
+    'hw-radar': <HWRadarPage />,
+    'hw-cert': <CertNavPage />,
+    'hw-proto': <PrototypingPage />,
+    'hw-social-trade': <SocialTradePage />,
     history: <HistoryPage />,
     book: <BookPage />,
     intl: <IntlPage />,

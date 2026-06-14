@@ -133,17 +133,63 @@ async def triple_helix(req: TripleHelixRequest):
         "lawyer": {"name": "律师", "analysis": f"【{req.project_name}】知识产权归属需明确，建议先申请核心专利再启动转化。合同设计注意技术秘密保护条款，NDA模板已备。"},
     }
 
-# ─── 硬件评估 ───
+# ─── 硬件评估（升级：芯片数据库 + FedCtx 语义匹配） ───
+_CHIP_DB = [
+    {"name": "RK3588", "vendor": "瑞芯微", "tops": 6, "power": "5-10W", "price": "200-400元", "local": True, "fit": ["边缘推理", "多模态", "视频分析"], "frameworks": ["ONNX", "TensorFlow Lite", "MNN"]},
+    {"name": "BM1684", "vendor": "算能", "tops": 17.6, "power": "10-15W", "price": "300-600元", "local": True, "fit": ["深度学习推理", "视频分析", "NLP"], "frameworks": ["ONNX", "TensorFlow", "BMLang"]},
+    {"name": "MLU270", "vendor": "寒武纪", "tops": 128, "power": "70W", "price": "2000-4000元", "local": True, "fit": ["训练+推理", "大模型", "搜索推荐"], "frameworks": ["PyTorch", "TensorFlow", "Cambricon Neuware"]},
+    {"name": "昇腾310", "vendor": "华为", "tops": 16, "power": "8W", "price": "400-800元", "local": True, "fit": ["边缘推理", "图像识别", "OCR"], "frameworks": ["MindSpore", "ONNX", "CANN"]},
+    {"name": "J5", "vendor": "地平线", "tops": 128, "power": "30W", "price": "800-1500元", "local": True, "fit": ["自动驾驶", "多摄感知", "BEV"], "frameworks": ["ONNX", "BPU Toolchain"]},
+    {"name": "A100", "vendor": "NVIDIA", "tops": 312, "power": "300W", "price": "8000-15000元", "local": False, "fit": ["训练+推理", "大模型", "科学计算"], "frameworks": ["CUDA", "TensorRT", "PyTorch"]},
+    {"name": "Orin NX", "vendor": "NVIDIA", "tops": 100, "power": "25W", "price": "2000-3500元", "local": False, "fit": ["自动驾驶", "机器人", "多模态"], "frameworks": ["CUDA", "TensorRT", "DeepStream"]},
+    {"name": "ESP32-S3", "vendor": "乐鑫", "tops": 0, "power": "0.5W", "price": "10-20元", "local": True, "fit": ["IoT", "语音唤醒", "简单分类"], "frameworks": ["TensorFlow Lite Micro", "ESP-DL"]},
+]
+
 @app.post("/api/hw-eval")
 async def hw_eval(req: HWEvalRequest):
+    # Match chips based on tech description keywords
+    desc_lower = (req.tech_name + " " + req.tech_description + " " + req.target_chip).lower()
+    scored_chips = []
+    for chip in _CHIP_DB:
+        score = 0
+        for keyword in chip["fit"]:
+            if keyword.lower() in desc_lower:
+                score += 2
+        if req.target_chip and req.target_chip.lower() in chip["name"].lower():
+            score += 5
+        if chip["local"]:
+            score += 1
+        scored_chips.append({**chip, "match_score": score})
+    scored_chips.sort(key=lambda x: x["match_score"], reverse=True)
+
+    best = scored_chips[0] if scored_chips else _CHIP_DB[0]
+    alt = scored_chips[1] if len(scored_chips) > 1 else _CHIP_DB[1]
+
+    # Try FedCtx for similar hardware evals
+    similar_count = 0
+    if _fedctx_available():
+        try:
+            similar = _fedctx_search(f"硬件评估 {req.tech_name}", k=3)
+            similar_count = len(similar)
+        except:
+            pass
+
     return {
         "name": req.tech_name,
-        "chip_benchmark": {"recommended": "RK3588 / 算能BM1684", "performance": "满足端侧推理需求", "power": "5-15W"},
-        "algorithm_fit": {"score": 72, "bottleneck": "模型量化精度损失", "optimization": "INT8量化+剪枝"},
-        "bom_cost": {"estimate": "500-2000元/台", "breakdown": {"chip": "200-800元", "sensor": "100-300元", "pcb": "50-150元", "assembly": "100-300元", "other": "50-450元"}},
-        "localization_rate": 65, "risk_level": "中等",
-        "suggestion": "建议优先验证RK3588适配性，同步评估国产替代方案。",
-        "source": "fallback"
+        "chip_benchmark": {
+            "recommended": f"{best['name']} ({best['vendor']})",
+            "alternative": f"{alt['name']} ({alt['vendor']})",
+            "performance": f"{best['tops']} TOPS",
+            "power": best["power"],
+            "frameworks": best["frameworks"],
+        },
+        "algorithm_fit": {"score": 72 + (best["match_score"] * 3), "bottleneck": "模型量化精度损失", "optimization": "INT8量化+剪枝"},
+        "bom_cost": {"estimate": "500-2000元/台", "breakdown": {"chip": best["price"], "sensor": "100-300元", "pcb": "50-150元", "assembly": "100-300元", "other": "50-450元"}},
+        "localization_rate": sum(1 for c in scored_chips[:3] if c["local"]) * 33,
+        "risk_level": "低" if best["local"] else "中等",
+        "suggestion": f"推荐 {best['name']}（{best['vendor']}），备选 {alt['name']}。{'国产方案，供应链稳定。' if best['local'] else '进口芯片，需关注出口管制风险。'}",
+        "source": "fedctx-enhanced" if similar_count > 0 else "fallback",
+        "all_chips": scored_chips[:5],
     }
 
 # ─── 硬件翻译 ───
@@ -948,6 +994,310 @@ async def llm_innovation_thermo():
             yield _sse("result", {"source": "llm", "analysis": result})
         yield _sse("done", {})
 
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+# ═══════════════════════════════════════════════════════════════
+# 10. HWRadar — 硬件雷达（芯片路线图 + 国产替代进度）
+# ═══════════════════════════════════════════════════════════════
+
+_HW_RADAR = [
+    {"category": "AI推理芯片", "chips": [
+        {"name": "RK3588", "vendor": "瑞芯微", "local": True, "maturity": 0.85, "sub_progress": "已量产", "next_gen": "RK3588S 2025Q4", "advantage": "性价比高，生态成熟"},
+        {"name": "BM1684X", "vendor": "算能", "local": True, "maturity": 0.75, "sub_progress": "已量产", "next_gen": "BM1688 2026Q1", "advantage": "INT8性能强"},
+        {"name": "昇腾310P", "vendor": "华为", "local": True, "maturity": 0.70, "sub_progress": "量产中", "next_gen": "昇腾910C 2025Q3", "advantage": "MindSpore生态"},
+        {"name": "A100", "vendor": "NVIDIA", "local": False, "maturity": 0.95, "sub_progress": "受限", "next_gen": "B200 2025Q2", "advantage": "CUDA生态无可替代"},
+    ]},
+    {"category": "自动驾驶芯片", "chips": [
+        {"name": "J5", "vendor": "地平线", "local": True, "maturity": 0.80, "sub_progress": "已量产", "next_gen": "J6 2025Q4", "advantage": "BEV感知优化"},
+        {"name": "Orin X", "vendor": "NVIDIA", "local": False, "maturity": 0.90, "sub_progress": "受限", "next_gen": "Thor 2026", "advantage": "生态完整"},
+        {"name": "昇腾610", "vendor": "华为", "local": True, "maturity": 0.60, "sub_progress": "验证中", "next_gen": "—", "advantage": "ADS全栈方案"},
+    ]},
+    {"category": "IoT芯片", "chips": [
+        {"name": "ESP32-S3", "vendor": "乐鑫", "local": True, "maturity": 0.90, "sub_progress": "已量产", "next_gen": "ESP32-P4 2025Q3", "advantage": "超低功耗，WiFi+BLE"},
+        {"name": "CH32V", "vendor": "沁恒", "local": True, "maturity": 0.85, "sub_progress": "已量产", "next_gen": "—", "advantage": "RISC-V，成本极低"},
+    ]},
+]
+
+@app.get("/api/hw-radar")
+async def hw_radar():
+    """硬件雷达 — 芯片路线图 + 国产替代进度"""
+    return {"source": "fallback", "categories": _HW_RADAR}
+
+
+@app.post("/api/llm/hw-radar")
+async def llm_hw_radar():
+    """LLM-enhanced HWRadar — 芯片选型建议"""
+    radar_text = json.dumps(_HW_RADAR, ensure_ascii=False)
+    def generate():
+        system = "你是硬件选型专家，分析芯片路线图，给出选型和替代建议。用中文回答，简洁专业。"
+        user = f"芯片路线图数据：{radar_text}\n\n请分析：1)各领域推荐方案 2)国产替代时机 3)供应链风险"
+        result = _llm_sync(system, user)
+        if result:
+            yield _sse("result", {"source": "llm", "analysis": result})
+        yield _sse("done", {})
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+# ═══════════════════════════════════════════════════════════════
+# 11. CertNav — 认证导航（3C/SRRC/算法备案全流程）
+# ═══════════════════════════════════════════════════════════════
+
+class CertNavRequest(BaseModel):
+    product_name: str; product_type: str = "智能硬件"
+
+_CERT_FLOWS = [
+    {
+        "name": "3C认证", "full_name": "中国强制性产品认证",
+        "required": True, "duration": "4-6个月", "cost": "3-8万",
+        "steps": ["申请受理", "资料审查", "送样检测", "工厂审查", "认证批准", "获证后监督"],
+        "tips": "需提前准备：产品说明书、电路图、BOM表、关键元器件清单",
+        "agencies": ["CQC", "CESI", "中检集团"],
+    },
+    {
+        "name": "SRRC核准", "full_name": "无线电发射设备型号核准",
+        "required": True, "duration": "2-3个月", "cost": "1-3万",
+        "steps": ["申请提交", "样品测试", "报告审核", "核准发证"],
+        "tips": "含WiFi/BLE/4G模块的设备必须申请，测试项目：频率容限、功率、杂散",
+        "agencies": ["SRRC", "各省无线电监测站"],
+    },
+    {
+        "name": "算法备案", "full_name": "深度合成服务算法备案",
+        "required": True, "duration": "1-2个月", "cost": "0.5-1万",
+        "steps": ["算法自评估", "备案材料准备", "网信部门审核", "备案公示"],
+        "tips": "含AI推理功能的设备需备案，重点说明：算法用途、数据来源、安全措施",
+        "agencies": ["国家网信办", "各省网信办"],
+    },
+    {
+        "name": "CE认证", "full_name": "欧盟符合性认证",
+        "required": False, "duration": "2-4个月", "cost": "2-5万",
+        "steps": ["确定指令", "自我声明/第三方评估", "技术文件编制", "签署DoC", "加贴CE标志"],
+        "tips": "出口欧盟必须，涉及RED/EMC/LVD指令",
+        "agencies": ["TÜV", "SGS", "BV"],
+    },
+    {
+        "name": "FCC认证", "full_name": "美国联邦通信委员会认证",
+        "required": False, "duration": "2-3个月", "cost": "1-3万",
+        "steps": ["测试申请", "EMC测试", "SAR测试(如适用)", "FCC ID申请"],
+        "tips": "出口美国必须，含无线功能需DoC或Certification",
+        "agencies": ["FCC", "UL"],
+    },
+]
+
+@app.post("/api/cert-nav")
+async def cert_nav(req: CertNavRequest):
+    """认证导航 — 3C/SRRC/算法备案全流程"""
+    # Determine which certs are needed based on product type
+    required_certs = [c for c in _CERT_FLOWS if c["required"]]
+    optional_certs = [c for c in _CERT_FLOWS if not c["required"]]
+
+    # Calculate parallel timeline
+    total_months = max(
+        float(c["duration"].replace("-", " to ").split()[0].replace("个月", ""))
+        for c in required_certs
+    )
+
+    return {
+        "product": req.product_name,
+        "type": req.product_type,
+        "required_certs": required_certs,
+        "optional_certs": optional_certs,
+        "parallel_timeline": f"{total_months:.0f}个月（并行申请）",
+        "total_cost": f"{sum(int(c['cost'].split('-')[0]) for c in required_certs)}-{sum(int(c['cost'].split('-')[-1].replace('万','')) for c in required_certs)}万",
+    }
+
+
+@app.post("/api/llm/cert-nav")
+async def llm_cert_nav(req: CertNavRequest):
+    """LLM-enhanced CertNav — 认证策略建议"""
+    base = await cert_nav(req)
+    cert_text = json.dumps(base["required_certs"], ensure_ascii=False)
+    def generate():
+        system = "你是产品认证顾问，给出认证策略和合规建议。用中文回答，简洁专业。"
+        user = f"产品：{req.product_name}（{req.product_type}）\n需认证项：{cert_text}\n并行周期：{base['parallel_timeline']}\n\n请分析：1)最优申请顺序 2)关键注意事项 3)成本优化建议"
+        result = _llm_sync(system, user)
+        if result:
+            yield _sse("result", {"source": "llm", "analysis": result})
+        yield _sse("done", {})
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+# ═══════════════════════════════════════════════════════════════
+# 12. Prototyping — 打样工坊（EVT→DVT→PVT→MP全流程）
+# ═══════════════════════════════════════════════════════════════
+
+class PrototypingRequest(BaseModel):
+    product_name: str; product_description: str = ""
+
+_PROTO_STAGES = [
+    {
+        "stage": "EVT", "name": "工程验证测试", "duration": "2-3个月",
+        "goals": ["功能验证", "关键器件选型确认", "PCB初版打样"],
+        "deliverables": ["EVT样机(3-5台)", "测试报告", "BOM初版"],
+        "risks": ["核心功能不达标", "器件缺货", "功耗超标"],
+        "gate": "功能达标率>90%",
+    },
+    {
+        "stage": "DVT", "name": "设计验证测试", "duration": "2-3个月",
+        "goals": ["可靠性测试", "EMC预测试", "模具设计确认"],
+        "deliverables": ["DVT样机(20-50台)", "可靠性报告", "模具T0"],
+        "risks": ["EMC不过", "结构干涉", "散热不达标"],
+        "gate": "可靠性MTBF>5000h",
+    },
+    {
+        "stage": "PVT", "name": "小批量试产", "duration": "1-2个月",
+        "goals": ["量产工艺验证", "良率提升", "产线调试"],
+        "deliverables": ["PVT产品(200-500台)", "SOP", "良率报告"],
+        "risks": ["良率低", "组装困难", "测试工装不稳定"],
+        "gate": "直通率>85%",
+    },
+    {
+        "stage": "MP", "name": "量产", "duration": "持续",
+        "goals": ["规模化生产", "成本优化", "品质管控"],
+        "deliverables": ["量产产品", "持续改进报告", "降本方案"],
+        "risks": ["供应链波动", "品质异常", "需求变化"],
+        "gate": "月产能达标",
+    },
+]
+
+@app.post("/api/prototyping")
+async def prototyping(req: PrototypingRequest):
+    """打样工坊 — EVT→DVT→PVT→MP全流程"""
+    total_duration = "5-8个月到量产"
+    return {
+        "product": req.product_name,
+        "stages": _PROTO_STAGES,
+        "total_duration": total_duration,
+        "key_milestones": [
+            f"EVT完成 → {2+2+1}个月",
+            f"DVT完成 → {2+2+1+2+3}个月",
+            f"PVT完成 → {5+1+2}个月",
+            f"MP启动 → {5+2+1}个月",
+        ],
+    }
+
+
+@app.post("/api/llm/prototyping")
+async def llm_prototyping(req: PrototypingRequest):
+    """LLM-enhanced Prototyping — 打样策略建议"""
+    proto_text = json.dumps(_PROTO_STAGES, ensure_ascii=False)
+    def generate():
+        system = "你是硬件产品经理，分析产品打样流程，给出时间线和风险建议。用中文回答，简洁专业。"
+        user = f"产品：{req.product_name}\n描述：{req.product_description}\n流程：{proto_text}\n\n请分析：1)关键路径 2)风险缓解 3)供应商推荐策略"
+        result = _llm_sync(system, user)
+        if result:
+            yield _sse("result", {"source": "llm", "analysis": result})
+        yield _sse("done", {})
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+# ═══════════════════════════════════════════════════════════════
+# 13. SocialHub — 社交传播交易（供需匹配 + 传播分析）
+# ═══════════════════════════════════════════════════════════════
+
+class SocialHubRequest(BaseModel):
+    query: str; role: str = "all"  # all / supply / demand
+
+_SUPPLY_DEMAND_DB = [
+    {"id": "S001", "type": "supply", "title": "联邦学习隐私计算平台", "org": "清华大学", "trl": "TRL6", "tags": ["联邦学习", "隐私计算"], "contact": "张教授"},
+    {"id": "S002", "type": "supply", "title": "AI视觉质检解决方案", "org": "中科院", "trl": "TRL5", "tags": ["机器视觉", "质检"], "contact": "李研究员"},
+    {"id": "S003", "type": "supply", "title": "数字孪生仿真平台", "org": "浙江大学", "trl": "TRL5", "tags": ["数字孪生", "仿真"], "contact": "王教授"},
+    {"id": "D001", "type": "demand", "title": "产线智能质检需求", "org": "苏州精密制造", "budget": "50-100万", "tags": ["质检", "AI视觉"], "contact": "陈总工"},
+    {"id": "D002", "type": "demand", "title": "医疗数据隐私分析需求", "org": "苏州第一人民医院", "budget": "30-80万", "tags": ["联邦学习", "医疗"], "contact": "刘主任"},
+    {"id": "D003", "type": "demand", "title": "智能仓储优化需求", "org": "苏州物流园", "budget": "20-50万", "tags": ["数字孪生", "仓储"], "contact": "赵经理"},
+]
+
+@app.post("/api/social-hub")
+async def social_hub(req: SocialHubRequest):
+    """社交传播交易 — 供需匹配"""
+    q_lower = req.query.lower()
+    matches = []
+    for item in _SUPPLY_DEMAND_DB:
+        if req.role != "all" and item["type"] != req.role:
+            continue
+        score = 0
+        text = f"{item['title']} {' '.join(item['tags'])}".lower()
+        for word in q_lower.split():
+            if word in text:
+                score += 1
+        if score > 0:
+            matches.append({**item, "match_score": score})
+
+    # Find potential matches (supply-demand pairs)
+    pairs = []
+    supplies = [m for m in matches if m["type"] == "supply"]
+    demands = [m for m in matches if m["type"] == "demand"]
+    for s in supplies:
+        for d in demands:
+            common = set(s["tags"]) & set(d["tags"])
+            if common:
+                pairs.append({"supply": s["title"], "demand": d["title"], "common_tags": list(common), "match_strength": len(common) / max(len(s["tags"]), 1)})
+
+    matches.sort(key=lambda x: x["match_score"], reverse=True)
+    return {"query": req.query, "results": matches, "pairs": pairs}
+
+
+@app.post("/api/llm/social-hub")
+async def llm_social_hub(req: SocialHubRequest):
+    """LLM-enhanced SocialHub — 供需撮合建议"""
+    base = await social_hub(req)
+    pairs_text = json.dumps(base["pairs"], ensure_ascii=False)
+    def generate():
+        system = "你是技术转移经纪人，分析供需匹配，给出撮合建议。用中文回答，简洁专业。"
+        user = f"查询：{req.query}\n匹配对：{pairs_text}\n\n请分析：1)最佳撮合方案 2)合作模式建议 3)风险提示"
+        result = _llm_sync(system, user)
+        if result:
+            yield _sse("result", {"source": "llm", "analysis": result})
+        yield _sse("done", {})
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+# ═══════════════════════════════════════════════════════════════
+# 14. SocialTrade — 硬件社交交易（开发者社区 + 供应链对接）
+# ═══════════════════════════════════════════════════════════════
+
+class SocialTradeRequest(BaseModel):
+    query: str; category: str = "all"  # all / developer / supplier / cert
+
+_HW_COMMUNITY = [
+    {"id": "DEV001", "type": "developer", "name": "嵌入式AI开发者", "skills": ["RK3588", "TensorFlow Lite", "MNN"], "projects": 12, "rating": 4.8},
+    {"id": "DEV002", "type": "developer", "name": "自动驾驶算法工程师", "skills": ["地平线J5", "BEV感知", "TensorRT"], "projects": 8, "rating": 4.5},
+    {"id": "DEV003", "type": "developer", "name": "IoT全栈开发者", "skills": ["ESP32", "MQTT", "嵌入式Linux"], "projects": 20, "rating": 4.9},
+    {"id": "SUP001", "type": "supplier", "name": "深圳PCB快板厂", "capability": "1-4层板，24h加急", "min_order": "5片", "lead_time": "2-5天"},
+    {"id": "SUP002", "type": "supplier", "name": "东莞注塑模具厂", "capability": "精密注塑，硅胶模具", "min_order": "100件", "lead_time": "15-20天"},
+    {"id": "SUP003", "type": "supplier", "name": "苏州SMT贴片厂", "capability": "0402元件，BGA贴装", "min_order": "50片", "lead_time": "3-7天"},
+    {"id": "CERT001", "type": "cert", "name": "3C认证代理（中检）", "service": "3C全流程代理", "duration": "4-6个月", "cost": "5-8万"},
+    {"id": "CERT002", "type": "cert", "name": "SRRC测试服务", "service": "无线电核准测试+申请", "duration": "2-3个月", "cost": "1.5-3万"},
+]
+
+@app.post("/api/social-trade")
+async def social_trade(req: SocialTradeRequest):
+    """硬件社交交易 — 开发者社区 + 供应链对接"""
+    q_lower = req.query.lower()
+    results = []
+    for item in _HW_COMMUNITY:
+        if req.category != "all" and item["type"] != req.category:
+            continue
+        text = " ".join(str(v) for v in item.values()).lower()
+        if any(w in text for w in q_lower.split()):
+            results.append(item)
+    if not results:
+        results = [item for item in _HW_COMMUNITY if req.category == "all" or item["type"] == req.category]
+    return {"query": req.query, "results": results}
+
+
+@app.post("/api/llm/social-trade")
+async def llm_social_trade(req: SocialTradeRequest):
+    """LLM-enhanced SocialTrade — 供应链对接建议"""
+    base = await social_trade(req)
+    results_text = json.dumps(base["results"][:5], ensure_ascii=False)
+    def generate():
+        system = "你是硬件供应链顾问，分析开发者/供应商/认证资源，给出对接建议。用中文回答，简洁专业。"
+        user = f"查询：{req.query}\n资源：{results_text}\n\n请分析：1)推荐开发者 2)推荐供应商 3)认证路径"
+        result = _llm_sync(system, user)
+        if result:
+            yield _sse("result", {"source": "llm", "analysis": result})
+        yield _sse("done", {})
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 
