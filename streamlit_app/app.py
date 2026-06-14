@@ -324,12 +324,42 @@ st.markdown("#### 🏆 Top 5 省份（技术转移指数）")
 top5 = get_top_provinces(5)
 top5_data = {"省份": [p["name"] for p in top5], "技术转移指数": [p["value"] for p in top5], "专利数(万)": [p["patents"]/10000 for p in top5], "年转化数": [p["transfers"] for p in top5]}
 import pandas as pd
-st.dataframe(pd.DataFrame(top5_data).style.background_gradient(subset=["技术转移指数"], cmap="YlOrRd").format({"专利数(万)": "{:.1f}"}), use_container_width=True, hide_index=True)
+# 颜色条用 st.column_config.ProgressColumn (内置, 无需 matplotlib)
+_top5_min = min(p["value"] for p in top5)
+_top5_max = max(p["value"] for p in top5)
+st.dataframe(
+    pd.DataFrame(top5_data),
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        "技术转移指数": st.column_config.ProgressColumn(
+            "技术转移指数",
+            min_value=_top5_min,
+            max_value=_top5_max,
+            format="%.0f",
+        ),
+        "专利数(万)": st.column_config.NumberColumn(format="%.1f"),
+    },
+)
 
 # 五大瓶颈
 st.markdown("#### ⚠️ 五大瓶颈（行业调研）")
 bn_data = {"瓶颈": [b["name"] for b in BOTTLENECKS], "严重度(0-100)": [b["score"] for b in BOTTLENECKS], "说明": [b["desc"] for b in BOTTLENECKS]}
-st.dataframe(pd.DataFrame(bn_data).style.background_gradient(subset=["严重度(0-100)"], cmap="YlOrRd"), use_container_width=True, hide_index=True)
+_bn_min = min(b["score"] for b in BOTTLENECKS)
+_bn_max = max(b["score"] for b in BOTTLENECKS)
+st.dataframe(
+    pd.DataFrame(bn_data),
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        "严重度(0-100)": st.column_config.ProgressColumn(
+            "严重度(0-100)",
+            min_value=_bn_min,
+            max_value=_bn_max,
+            format="%.0f",
+        ),
+    },
+)
 
 # 案例精选
 st.markdown("---")

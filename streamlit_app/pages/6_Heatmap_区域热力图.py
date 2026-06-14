@@ -34,7 +34,19 @@ top5 = df.sort_values("value", ascending=False).head(5)
 top5_display = top5[["name", "value", "patents", "transfers", "institutes"]].rename(columns={
     "name": "省份", "value": "技术转移指数", "patents": "专利数", "transfers": "年转化数", "institutes": "机构数"
 })
-st.dataframe(top5_display.style.background_gradient(subset=["技术转移指数"], cmap="YlOrRd").format({"专利数": "{:,}"}), use_container_width=True, hide_index=True)
+_top5_v_min = int(top5_display["技术转移指数"].min())
+_top5_v_max = int(top5_display["技术转移指数"].max())
+st.dataframe(
+    top5_display,
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        "技术转移指数": st.column_config.ProgressColumn(
+            "技术转移指数", min_value=_top5_v_min, max_value=_top5_v_max, format="%d"
+        ),
+        "专利数": st.column_config.NumberColumn(format="%d"),
+    },
+)
 
 st.markdown("---")
 st.markdown("### 🗺️ 全部 31 省数据（按指数排序）")
@@ -43,7 +55,20 @@ df_sorted["排名"] = df_sorted.index + 1
 display_df = df_sorted[["排名", "name", "value", "patents", "transfers", "institutes"]].rename(columns={
     "name": "省份", "value": "技术转移指数", "patents": "专利数", "transfers": "年转化数", "institutes": "机构数"
 })
-st.dataframe(display_df.style.background_gradient(subset=["技术转移指数"], cmap="YlOrRd").format({"专利数": "{:,}"}), use_container_width=True, hide_index=True, height=600)
+_df_v_min = int(display_df["技术转移指数"].min())
+_df_v_max = int(display_df["技术转移指数"].max())
+st.dataframe(
+    display_df,
+    use_container_width=True,
+    hide_index=True,
+    height=600,
+    column_config={
+        "技术转移指数": st.column_config.ProgressColumn(
+            "技术转移指数", min_value=_df_v_min, max_value=_df_v_max, format="%d"
+        ),
+        "专利数": st.column_config.NumberColumn(format="%d"),
+    },
+)
 
 st.markdown("---")
 st.markdown("### 🏆 江苏（苏州）vs 全国对比")
@@ -67,7 +92,19 @@ yrd_provinces = df[df["name"].isin(["上海", "江苏", "浙江", "安徽"])].co
 yrd_data = yrd_provinces[["name", "value", "patents", "transfers", "institutes"]].rename(columns={
     "name": "省份", "value": "技术转移指数", "patents": "专利数", "transfers": "年转化数", "institutes": "机构数"
 })
-st.dataframe(yrd_data.style.background_gradient(subset=["技术转移指数"], cmap="Blues").format({"专利数": "{:,}"}), use_container_width=True, hide_index=True)
+_yrd_v_min = int(yrd_data["技术转移指数"].min())
+_yrd_v_max = int(yrd_data["技术转移指数"].max())
+st.dataframe(
+    yrd_data,
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        "技术转移指数": st.column_config.ProgressColumn(
+            "技术转移指数", min_value=_yrd_v_min, max_value=_yrd_v_max, format="%d"
+        ),
+        "专利数": st.column_config.NumberColumn(format="%d"),
+    },
+)
 
 st.markdown("---")
 st.markdown("### ⚠️ 五大瓶颈 vs 区域分布")

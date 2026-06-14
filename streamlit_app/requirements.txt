@@ -1,2 +1,4 @@
 streamlit>=1.32.0
 pandas>=2.0.0
+# matplotlib 兜底: pd.DataFrame.style.background_gradient() 需要 (Streamlit Cloud 默认 venv 不预装)
+matplotlib>=3.7.0
