@@ -11,7 +11,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-st.caption("💡 在主项目（React + FastAPI）中，标注 ⭐ 的模块支持实时 AI 增强流式输出。镜像版展示完整设计。")
+st.caption("💡 在主项目（React + FastAPI）中，标注 ⭐ 的模块支持实时 AI 增强流式输出。镜像版展示完整设计。8/9 硬件模块已在主项目中实现交互功能。")
 
 st.markdown("### 🧩 模块矩阵")
 cols = st.columns(3)

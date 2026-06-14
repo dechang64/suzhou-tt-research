@@ -52,25 +52,25 @@ BOTTLENECKS = [
 # ─── 8 个 TT-OPC 软件模块 ───
 TT_MODULES = [
     {"id": "tt-blindbox", "name": "盲盒评估", "nameEn": "TechBlindBox", "icon": "📦", "theory": "Arrow 信息悖论", "theoryId": "arrow", "desc": "不泄露技术就能评估价值——解决技术买卖中的核心矛盾", "color": "#ef4444", "interactive": True, "features": ["SWOT 四象限自动生成", "TRL 成熟度评估", "市场规模/竞品/风险/时间表自动测算", "LLM AI 增强流式输出"]},
-    {"id": "tt-fedmatch", "name": "联邦匹配", "nameEn": "FedMatch", "icon": "🔗", "theory": "联邦学习经济学", "theoryId": "fed", "desc": "跨校专利数据不出校就能匹配需求方", "color": "#8b5cf6", "interactive": False, "features": ["联邦学习 + HNSW 向量检索", "高校专利数据不出域", "需求方画像自动匹配", "Top-K 语义相似度排序"]},
-    {"id": "tt-knowledge", "name": "知识图谱", "nameEn": "KnowledgeFlow", "icon": "🌐", "theory": "内生增长理论", "theoryId": "romer", "desc": "可视化知识从论文到产品的流动路径", "color": "#3b82f6", "interactive": False, "features": ["知识溢出路径可视化", "论文→产品全链路追踪", "作者-机构-领域三方图谱", "Neo4j 图数据库后端"]},
-    {"id": "tt-radar", "name": "技术雷达", "nameEn": "TechRadar", "icon": "📡", "theory": "创造性破坏", "theoryId": "schumpeter", "desc": "预测技术生命周期和替代时机", "color": "#10b981", "interactive": False, "features": ["技术 S 曲线预测", "替代时机窗口识别", "专利申请趋势 + 论文增长", "跨领域技术交叉预警"]},
+    {"id": "tt-fedmatch", "name": "联邦匹配", "nameEn": "FedMatch", "icon": "🔗", "theory": "联邦学习经济学", "theoryId": "fed", "desc": "跨校专利数据不出校就能匹配需求方", "color": "#8b5cf6", "interactive": True, "features": ["联邦学习 + HNSW 向量检索", "高校专利数据不出域", "需求方画像自动匹配", "Top-K 语义相似度排序"]},
+    {"id": "tt-knowledge", "name": "知识图谱", "nameEn": "KnowledgeFlow", "icon": "🌐", "theory": "内生增长理论", "theoryId": "romer", "desc": "可视化知识从论文到产品的流动路径", "color": "#3b82f6", "interactive": True, "features": ["知识溢出路径可视化", "论文→产品全链路追踪", "作者-机构-领域三方图谱", "PageRank 重要性排序"]},
+    {"id": "tt-radar", "name": "技术雷达", "nameEn": "TechRadar", "icon": "📡", "theory": "创造性破坏", "theoryId": "schumpeter", "desc": "预测技术生命周期和替代时机", "color": "#10b981", "interactive": True, "features": ["技术 S 曲线预测", "替代时机窗口识别", "专利申请趋势 + 论文增长", "PageRank 技术重要性排序"]},
     {"id": "tt-translate", "name": "场景翻译", "nameEn": "TechTranslator", "icon": "🔄", "theory": "吸收能力理论", "theoryId": "absorptive", "desc": "一键生成投资人/CEO/院长版技术描述", "color": "#ec4899", "interactive": True, "features": ["投资人/CEO/院长 三版本自动翻译", "SSE 流式逐版本推送", "L1/L2/L3 吸收能力适配", "LLM AI 增强"]},
     {"id": "tt-triple", "name": "三角色工作台", "nameEn": "TripleHelix", "icon": "🧬", "theory": "三螺旋理论", "theoryId": "triple", "desc": "教授+CEO+律师三 Agent 协同分析", "color": "#6366f1", "interactive": True, "features": ["教授视角:技术可行性+学术价值", "CEO 视角:市场机会+商业模式", "律师视角:合规风险+知识产权", "三 Agent 协同流式输出"]},
-    {"id": "tt-social", "name": "社交传播交易", "nameEn": "SocialHub", "icon": "🌐", "theory": "网络效应+双边市场", "theoryId": "network", "desc": "社交+传播+交易一体化", "color": "#14b8a6", "interactive": False, "features": ["OPC 社区+技术交易撮合", "用户数² 网络效应放大", "双边市场供需动态平衡", "FedCtx 语义检索"]},
-    {"id": "tt-thermo", "name": "创新温度计", "nameEn": "InnovationThermo", "icon": "🌡️", "theory": "GPT 渗透+新质生产力", "theoryId": "us-ai", "desc": "实时测量 AI 渗透率", "color": "#f59e0b", "interactive": False, "features": ["GPT/AI 渗透率实时测算", "新质生产力指标体系", "区域创新热度地图", "季度/年度趋势报告"]},
+    {"id": "tt-social", "name": "社交传播交易", "nameEn": "SocialHub", "icon": "🌐", "theory": "网络效应+双边市场", "theoryId": "network", "desc": "社交+传播+交易一体化", "color": "#14b8a6", "interactive": True, "features": ["OPC 社区+技术交易撮合", "供需匹配+撮合推荐", "双边市场供需动态平衡", "FedCtx 语义检索"]},
+    {"id": "tt-thermo", "name": "创新温度计", "nameEn": "InnovationThermo", "icon": "🌡️", "theory": "GPT 渗透+新质生产力", "theoryId": "us-ai", "desc": "实时测量 AI 渗透率", "color": "#f59e0b", "interactive": True, "features": ["10 大行业 AI 渗透率实时测算", "新质生产力指标体系", "温度计可视化+行业网格", "全国均值对比"]},
 ]
 
 # ─── 9 个 HW-OPC 硬件模块 ───
 HW_MODULES = [
     {"id": "hw-eval", "name": "硬件评估", "nameEn": "HWEval", "icon": "📊", "theory": "芯片 Benchmark", "desc": "芯片适配+BOM 成本+国产化率", "color": "#0984e3", "interactive": True, "features": ["内置国产 AI 芯片数据库 (RK3588/BM1684/...)", "算法-芯片适配度评分 (0-100)", "BOM 成本自动拆解 (芯片/传感器/PCB/组装/其他)", "国产化率+风险等级"]},
-    {"id": "hw-supply", "name": "供应链图谱", "nameEn": "SupplyChain", "icon": "🔗", "theory": "产业链协同", "desc": "算法→芯片→ODM→认证全链路", "color": "#6c5ce7", "interactive": False, "features": ["内置 ODM/传感器/认证机构库", "算法-芯片-ODM 链路匹配", "国产替代进度追踪", "BOM 成本优化建议"]},
+    {"id": "hw-supply", "name": "供应链图谱", "nameEn": "SupplyChain", "icon": "🔗", "theory": "产业链协同", "desc": "算法→芯片→ODM→认证全链路", "color": "#6c5ce7", "interactive": True, "features": ["7 层产业链可视化", "算法-芯片-ODM 链路匹配", "国产化率进度条", "BOM 成本优化建议"]},
     {"id": "hw-translate", "name": "硬件翻译", "nameEn": "HWTranslator", "icon": "🔄", "theory": "吸收能力", "desc": "硬件规格书→4 个专业版本", "color": "#e17055", "interactive": True, "features": ["投资人/PM/供应链/认证 四版本", "硬件领域专业 Prompt 模板", "SSE 流式输出", "BOM/交期/认证 自动嵌入"]},
     {"id": "hw-quad", "name": "四角色工作台", "nameEn": "QuadHelix", "icon": "🧬", "theory": "四螺旋", "desc": "算法专家+硬件 PM+供应链专家+认证顾问", "color": "#00b894", "interactive": True, "features": ["算法专家视角: ONNX+TensorRT 部署", "硬件 PM 视角: EVT→DVT→PVT→MP", "供应链专家视角: BOM+备选供应商", "认证顾问视角: 3C/SRRC/算法备案"]},
-    {"id": "hw-radar", "name": "硬件雷达", "nameEn": "HWRadar", "icon": "📡", "theory": "技术预测", "desc": "芯片路线图+国产替代进度", "color": "#fdcb6e", "interactive": False, "features": ["覆盖 7 类器件 (MCU/SoC/PMIC/Sensor/...)", "芯片路线图 0-36 月预测", "国产替代率月度更新", "供应链断点预警"]},
-    {"id": "hw-cert", "name": "认证导航", "nameEn": "CertNav", "icon": "📋", "theory": "合规管理", "desc": "3C/SRRC/算法备案全流程", "color": "#d63031", "interactive": False, "features": ["3C 认证 (4-6 个月)", "SRRC 核准 (2-3 个月)", "算法备案 (1-2 个月)", "并行策略+材料清单"]},
-    {"id": "hw-proto", "name": "打样工坊", "nameEn": "Prototyping", "icon": "🏭", "theory": "敏捷开发", "desc": "EVT→DVT→PVT→MP 全流程", "color": "#00cec9", "interactive": False, "features": ["BOM 估算+风险管理", "EVT/DVT/PVT/MP 阶段追踪", "工时/物料/良率看板", "量产前 Check List"]},
-    {"id": "hw-social-trade", "name": "社交交易", "nameEn": "SocialTrade", "icon": "🌐", "theory": "网络效应", "desc": "硬件开发者社区+供应链对接", "color": "#e84393", "interactive": False, "features": ["硬件开发者社区", "供应链对接 (BOM 共享+议价)", "供需匹配+数据看板", "FedCtx 语义检索"]},
+    {"id": "hw-radar", "name": "硬件雷达", "nameEn": "HWRadar", "icon": "📡", "theory": "技术预测", "desc": "芯片路线图+国产替代进度", "color": "#fdcb6e", "interactive": True, "features": ["3 类芯片路线图 (AI推理/自动驾驶/IoT)", "国产/进口成熟度对比", "下一代芯片预测", "国产替代进度追踪"]},
+    {"id": "hw-cert", "name": "认证导航", "nameEn": "CertNav", "icon": "📋", "theory": "合规管理", "desc": "3C/SRRC/算法备案全流程", "color": "#d63031", "interactive": True, "features": ["3C/SRRC/算法备案/CE/FCC 全流程", "并行申请时间线", "步骤+材料+机构清单", "费用预估"]},
+    {"id": "hw-proto", "name": "打样工坊", "nameEn": "Prototyping", "icon": "🏭", "theory": "敏捷开发", "desc": "EVT→DVT→PVT→MP 全流程", "color": "#00cec9", "interactive": True, "features": ["EVT→DVT→PVT→MP 4 阶段时间线", "目标/交付物/风险/Gate 全追踪", "工时/物料/良率看板", "量产前 Check List"]},
+    {"id": "hw-social-trade", "name": "社交交易", "nameEn": "SocialTrade", "icon": "🌐", "theory": "网络效应", "desc": "硬件开发者社区+供应链对接", "color": "#e84393", "interactive": True, "features": ["硬件开发者社区", "供应商/认证机构库", "供需匹配+数据看板", "FedCtx 语义检索"]},
     {"id": "hw-overview", "name": "总览", "nameEn": "Overview", "icon": "🏠", "theory": "全景仪表盘", "desc": "七层产业链可视化+竞品对比", "color": "#636e72", "interactive": False, "features": ["七层产业链可视化 (算法→芯片→ODM→生产→认证→渠道→用户)", "竞品对比 (按芯片/算法/BOM/认证多维度)", "苏州 vs 长三角主要城市对比", "OPC 全景仪表盘"]},
 ]
 
