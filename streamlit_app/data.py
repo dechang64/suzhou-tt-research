@@ -199,7 +199,7 @@ PUBLICATIONS = [
 HERO_QUOTES = [
     {"text": "OPC 不是'一个人的小公司'，而是'一个人 + AI = 一支团队'", "icon": "🚀", "author": "TT-OPC 平台核心论断"},
     {"text": "AI 是某个人协作方式，是贯穿全链路的'操作系统'", "icon": "💡", "author": "Slogan"},
-    {"text": "技术转移是经济学的 24 个理论在 8+9 个模块的工程实现", "icon": "📚", "author": "设计哲学"},
+    {"text": "技术转移是经济学的 12 个理论在 8+9 个模块的工程实现", "icon": "📚", "author": "设计哲学"},
 ]
 
 
