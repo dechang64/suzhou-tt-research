@@ -137,6 +137,8 @@ st.markdown("""
     [data-theme="dark"] .rec-card, [data-theme="dark"] .pub-card {
         background: #1e293b;
     }
+    /* 隐藏 streamlit multipage app 默认生成的 sidebar 导航 (我们用主页内容区导航) */
+    [data-testid="stSidebarNav"] { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -370,6 +372,35 @@ for i, case in enumerate(featured):
             <div style="font-size: 0.88rem; color: #10b981; line-height: 1.6;">{outcomes}</div>
             <div style="margin-top: 8px; font-size: 0.8rem; color: #94a3b8;">🏛️ {case['institution']} · 📅 {case['year']}</div>
         </div>
+        """, unsafe_allow_html=True)
+
+# ─── Page 导航 (因 sidebar 自动导航已隐藏, 主页提供 6 个 page 卡片入口) ───
+st.markdown("---")
+st.markdown("### 🧭 深入探索 · 6 大主题页面")
+st.caption("点击下方任意卡片进入对应主题页面")
+
+# 用 st.page_link 提供 6 个内部 page 链接 + 文字说明
+page_links = [
+    ("🧠", "TheoryMap_理论地图", "12 个经济学理论 → 17 个模块的对应关系", "#3b82f6"),
+    ("📦", "TT-OPC_软件模块", "8 大软件模块：盲盒评估 / 联邦匹配 / 三螺旋工作台 ...", "#ef4444"),
+    ("📊", "HW-OPC_硬件模块", "9 大硬件模块：芯片 Benchmark / BOM / 认证导航 ...", "#0984e3"),
+    ("🌏", "IntlCases_国际案例", "美国波士顿 / 德国 Fraunhofer / RTP / 松山湖 + 6 国内标杆", "#7c3aed"),
+    ("📚", "Publications_成果汇编", "5 项已发表/在投成果 · 顶刊 + 党刊 + 咨政报告", "#10b981"),
+    ("🗺️", "Heatmap_区域热力图", "31 省技术转移指数 + 长三角对比 + 苏州 vs 全国", "#f59e0b"),
+]
+
+nav_cols = st.columns(3)
+for i, (icon, page, desc, color) in enumerate(page_links):
+    with nav_cols[i % 3]:
+        st.markdown(f"""
+        <a href="{page}" target="_self" style="text-decoration: none;">
+            <div style="background: var(--background-color, white); border-left: 4px solid {color}; border-radius: 8px; padding: 14px 16px; margin: 6px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); cursor: pointer; transition: transform 0.15s;">
+                <div style="font-size: 1.6rem;">{icon}</div>
+                <div style="font-size: 1.05rem; font-weight: 700; margin: 4px 0;">{page.split('_', 1)[1] if '_' in page else page}</div>
+                <div style="font-size: 0.82rem; color: #64748b; line-height: 1.5;">{desc}</div>
+                <div style="font-size: 0.75rem; color: {color}; margin-top: 6px; font-weight: 600;">→ 进入页面</div>
+            </div>
+        </a>
         """, unsafe_allow_html=True)
 
 # ─── 部署信息 ───
