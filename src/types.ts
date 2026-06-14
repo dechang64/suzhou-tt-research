@@ -74,3 +74,20 @@ export interface SupplyChainResult {
     localization: Record<string, number>;
   };
 }
+
+export interface TechRadarResult {
+  source: string;
+  technologies: Array<{
+    name: string; field: string; phase: string; maturity: number;
+    pagerank: number; patents_2024: number; growth_yoy: string;
+    substitutes: string[];
+  }>;
+}
+
+export interface InnovationThermoResult {
+  source: string; total_vectors: number; national_avg: number; updated: string;
+  industries: Array<{
+    industry: string; ai_rate: number; trend: string;
+    key_apps: string[]; patents: number; growth: string;
+  }>;
+}

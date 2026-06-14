@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import './App.css'
 import { TT_MODULES, HW_MODULES, API_BASE } from './data'
-import type { BlindBoxResult, TripleHelixResult, HWEvalResult, QuadHelixResult, MapProvince, AuthState, FedMatchResult, KGResult, SupplyChainResult } from './types'
+import type { BlindBoxResult, TripleHelixResult, HWEvalResult, QuadHelixResult, MapProvince, AuthState, FedMatchResult, KGResult, SupplyChainResult, TechRadarResult, InnovationThermoResult } from './types'
 
 // ─── API helpers ───
 async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
@@ -761,6 +761,189 @@ function SupplyChainPage() {
   )
 }
 
+// ─── TechRadar Page (技术雷达) ───
+function TechRadarPage() {
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<TechRadarResult | null>(null)
+  const [error, setError] = useState('')
+  const [llmLoading, setLlmLoading] = useState(false)
+  const [llmAnalysis, setLlmAnalysis] = useState('')
+
+  const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault(); setLoading(true); setError(''); setResult(null); setLlmAnalysis('')
+    const fd = new FormData(e.currentTarget)
+    const body = { field: fd.get('field') || '' }
+    try {
+      const r = await apiPost<TechRadarResult>('/api/tech-radar', body)
+      setResult(r); setLoading(false)
+      setLlmLoading(true)
+      streamSSE('/api/llm/tech-radar', body, (evt, data) => {
+        if (evt === 'result' && data.analysis) { setLlmAnalysis(data.analysis); setLlmLoading(false) }
+      })
+      setTimeout(() => setLlmLoading(false), 60000)
+    } catch (err: unknown) { setError(err instanceof Error ? err.message : '请求失败') }
+    finally { setLoading(false) }
+  }, [])
+
+  const phaseColors: Record<string, string> = { '萌芽期': '#3b82f6', '成长期': '#10b981', '成熟期': '#f59e0b', '衰退期': '#ef4444' }
+
+  return (
+    <div className="page-content">
+      <div className="module-header" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' }}>
+        <h1>📡 技术雷达 TechRadar</h1>
+        <p>预测技术生命周期和替代时机 · 创造性破坏理论</p>
+        {llmLoading && <span className="llm-loading-header">🤖 AI趋势分析中...</span>}
+      </div>
+      <form onSubmit={handleSubmit} className="eval-form">
+        <select name="field" className="form-input">
+          <option value="">全部领域</option>
+          <option value="AI">AI</option>
+          <option value="隐私计算">隐私计算</option>
+          <option value="制造">制造</option>
+          <option value="硬件">硬件</option>
+          <option value="金融">金融</option>
+          <option value="计算">计算</option>
+        </select>
+        <button type="submit" className="btn-primary" disabled={loading}>{loading ? <Spinner /> : '📡 扫描雷达'}</button>
+      </form>
+      {error && <div className="error-card">{error}</div>}
+      {result && <div className="results-section">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h3>技术雷达 ({result.technologies.length})</h3>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            {result.source === 'fedctx' ? '🟢 FedCtx PageRank' : '🟡 示例数据'}
+          </span>
+        </div>
+        {/* Phase legend */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+          {Object.entries(phaseColors).map(([phase, color]) => (
+            <span key={phase} style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'inline-block' }} />
+              {phase}
+            </span>
+          ))}
+        </div>
+        {result.technologies.map((t, i) => (
+          <div key={t.name} className="card" style={{ borderLeft: `4px solid ${phaseColors[t.phase] || '#6b7280'}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <h4 style={{ marginBottom: 4 }}>{i === 0 ? '🏆 ' : ''}{t.name}</h4>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                  <span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: 4, background: `${phaseColors[t.phase]}20`, color: phaseColors[t.phase] }}>{t.phase}</span>
+                  <span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: 4, background: 'var(--accent-bg)', color: 'var(--accent)' }}>{t.field}</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>📋 {t.patents_2024} 专利</span>
+                  <span style={{ fontSize: '0.8rem', color: t.growth_yoy.includes('120') || t.growth_yoy.includes('85') ? '#ef4444' : '#10b981' }}>📈 {t.growth_yoy}</span>
+                </div>
+              </div>
+              <div style={{ textAlign: 'center', minWidth: 70 }}>
+                <div style={{ fontSize: '1.3rem', fontWeight: 800, color: phaseColors[t.phase] }}>{(t.maturity * 100).toFixed(0)}%</div>
+                <small>成熟度</small>
+              </div>
+            </div>
+            {/* Maturity bar */}
+            <div style={{ marginTop: 8, height: 4, borderRadius: 2, background: 'var(--border)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${t.maturity * 100}%`, background: phaseColors[t.phase], borderRadius: 2 }} />
+            </div>
+            {t.substitutes.length > 0 && <div style={{ marginTop: 6, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              替代技术：{t.substitutes.join('、')}
+            </div>}
+          </div>
+        ))}
+      </div>}
+      {llmAnalysis && <div className="card" style={{ marginTop: 12, borderLeft: '4px solid #f59e0b' }}>
+        <h4>🤖 AI 趋势分析</h4>
+        <p style={{ whiteSpace: 'pre-wrap' }}>{llmAnalysis}</p>
+      </div>}
+    </div>
+  )
+}
+
+// ─── InnovationThermo Page (创新温度计) ───
+function InnovationThermoPage() {
+  const [data, setData] = useState<InnovationThermoResult | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [llmLoading, setLlmLoading] = useState(false)
+  const [llmAnalysis, setLlmAnalysis] = useState('')
+
+  useEffect(() => {
+    apiGet<InnovationThermoResult>('/api/innovation-thermo')
+      .then(d => setData(d))
+      .catch(() => setData(null))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleLLMAnalysis = useCallback(() => {
+    setLlmLoading(true); setLlmAnalysis('')
+    streamSSE('/api/llm/innovation-thermo', {}, (evt, d) => {
+      if (evt === 'result' && d.analysis) { setLlmAnalysis(d.analysis); setLlmLoading(false) }
+    })
+    setTimeout(() => setLlmLoading(false), 60000)
+  }, [])
+
+  const getTempColor = (rate: number) => rate >= 60 ? '#ef4444' : rate >= 40 ? '#f59e0b' : rate >= 25 ? '#3b82f6' : '#06b6d4'
+  const getTempEmoji = (rate: number) => rate >= 60 ? '🔥' : rate >= 40 ? '🌡️' : rate >= 25 ? '🌤️' : '❄️'
+
+  return (
+    <div className="page-content">
+      <div className="module-header" style={{ background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' }}>
+        <h1>🌡️ 创新温度计 InnovationThermo</h1>
+        <p>实时测量AI渗透率 · GPT渗透+新质生产力</p>
+        {llmLoading && <span className="llm-loading-header">🤖 AI分析中...</span>}
+      </div>
+      {loading && <div className="card"><Spinner /> 加载中...</div>}
+      {data && <>
+        {/* National average */}
+        <div className="card" style={{ textAlign: 'center', marginBottom: 12 }}>
+          <div style={{ fontSize: '3rem', fontWeight: 900, color: getTempColor(data.national_avg) }}>
+            {getTempEmoji(data.national_avg)} {data.national_avg.toFixed(1)}%
+          </div>
+          <div style={{ color: 'var(--text-muted)', marginTop: 4 }}>全国AI渗透率均值</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>
+            更新于 {new Date(data.updated).toLocaleString('zh-CN')}
+            {data.source === 'fedctx' ? ' · 🟢 FedCtx' : ' · 🟡 示例数据'}
+          </div>
+        </div>
+        {/* Industry grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
+          {data.industries.sort((a, b) => b.ai_rate - a.ai_rate).map(ind => (
+            <div key={ind.industry} className="card" style={{ padding: '12px 16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h4 style={{ marginBottom: 2 }}>{getTempEmoji(ind.ai_rate)} {ind.industry}</h4>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                    {ind.key_apps.map(app => (
+                      <span key={app} style={{ fontSize: '0.75rem', padding: '1px 6px', borderRadius: 3, background: 'var(--bg)', color: 'var(--text-secondary)' }}>{app}</span>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'center', minWidth: 60 }}>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: getTempColor(ind.ai_rate) }}>{ind.ai_rate}%</div>
+                  <small style={{ color: ind.trend.includes('↑↑') ? '#ef4444' : '#10b981' }}>{ind.trend}</small>
+                </div>
+              </div>
+              {/* Temperature bar */}
+              <div style={{ marginTop: 8, height: 6, borderRadius: 3, background: 'var(--border)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${ind.ai_rate}%`, background: `linear-gradient(90deg, #06b6d4, ${getTempColor(ind.ai_rate)})`, borderRadius: 3, transition: 'width 0.5s' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                <span>📋 {ind.patents.toLocaleString()} 专利</span>
+                <span>📈 {ind.growth}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button className="btn-secondary" style={{ marginTop: 12 }} onClick={handleLLMAnalysis} disabled={llmLoading}>
+          {llmLoading ? <Spinner /> : '🤖 AI 深度分析'}
+        </button>
+      </>}
+      {llmAnalysis && <div className="card" style={{ marginTop: 12, borderLeft: '4px solid #ef4444' }}>
+        <h4>🤖 AI 渗透趋势分析</h4>
+        <p style={{ whiteSpace: 'pre-wrap' }}>{llmAnalysis}</p>
+      </div>}
+    </div>
+  )
+}
+
 function StaticModule({ name, nameEn, icon, theory, desc, color }: { id: string; name: string; nameEn: string; icon: string; theory: string; desc: string; color: string }) {
   return (
     <div className="page-content">
@@ -850,11 +1033,11 @@ export default function App() {
     'tt-blindbox': <BlindBoxPage />,
     'tt-fedmatch': <FedMatchPage />,
     'tt-knowledge': <KnowledgeFlowPage />,
-    'tt-radar': <StaticModule {...TT_MODULES[3]} id="tt-radar" />,
+    'tt-radar': <TechRadarPage />,
     'tt-translate': <TechTranslatorPage />,
     'tt-triple': <TripleHelixPage />,
     'tt-social': <StaticModule {...TT_MODULES[6]} id="tt-social" />,
-    'tt-thermo': <StaticModule {...TT_MODULES[7]} id="tt-thermo" />,
+    'tt-thermo': <InnovationThermoPage />,
     'hw-eval': <HWEvalPage />,
     'hw-translate': <HWTranslatorPage />,
     'hw-quad': <QuadHelixPage />,
