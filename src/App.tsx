@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import './App.css'
 import { TT_MODULES, HW_MODULES, API_BASE } from './data'
-import type { BlindBoxResult, TripleHelixResult, HWEvalResult, QuadHelixResult, MapProvince, AuthState, EvaluationRecord } from './types'
+import type { BlindBoxResult, TripleHelixResult, HWEvalResult, QuadHelixResult, MapProvince, AuthState, FedMatchResult, KGResult, SupplyChainResult } from './types'
 
 // ─── API helpers ───
 async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
@@ -479,6 +479,288 @@ function QuadHelixPage() {
 }
 
 // ─── Static Module Page ───
+// ─── FedMatch Page (联邦匹配) ───
+function FedMatchPage() {
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<FedMatchResult | null>(null)
+  const [error, setError] = useState('')
+  const [llmLoading, setLlmLoading] = useState(false)
+  const [llmAnalysis, setLlmAnalysis] = useState('')
+
+  const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault(); setLoading(true); setError(''); setResult(null); setLlmAnalysis('')
+    const fd = new FormData(e.currentTarget)
+    const body = { query: fd.get('query'), k: 10 }
+    try {
+      const r = await apiPost<FedMatchResult>('/api/fedmatch', body)
+      setResult(r); setLoading(false)
+      setLlmLoading(true)
+      streamSSE('/api/llm/fedmatch', body, (evt, data) => {
+        if (evt === 'result' && data.analysis) { setLlmAnalysis(data.analysis); setLlmLoading(false) }
+      })
+      setTimeout(() => setLlmLoading(false), 60000)
+    } catch (err: unknown) { setError(err instanceof Error ? err.message : '请求失败') }
+    finally { setLoading(false) }
+  }, [])
+
+  return (
+    <div className="page-content">
+      <div className="module-header" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' }}>
+        <h1>🔗 联邦匹配 FedMatch</h1>
+        <p>跨校专利数据不出校就能匹配 · 联邦学习经济学</p>
+        {llmLoading && <span className="llm-loading-header">🤖 AI深度分析中...</span>}
+      </div>
+      <form onSubmit={handleSubmit} className="eval-form">
+        <input name="query" placeholder="输入技术需求或关键词（如：联邦学习 医疗影像）*" required className="form-input" />
+        <button type="submit" className="btn-primary" disabled={loading}>{loading ? <Spinner /> : '🔍 开始匹配'}</button>
+      </form>
+      {error && <div className="error-card">{error}</div>}
+      {result && <div className="results-section">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h3>匹配结果 ({result.total})</h3>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            {result.source === 'fedctx' ? '🟢 FedCtx 语义检索' : '🟡 关键词匹配'}
+          </span>
+        </div>
+        {result.results.map((r, i) => (
+          <div key={r.id} className="card" style={{ borderLeft: `4px solid ${i === 0 ? '#3b82f6' : '#e5e7eb'}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <h4 style={{ marginBottom: 4 }}>{i === 0 ? '🏆 ' : ''}{r.title}</h4>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                  <span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: 4, background: 'var(--accent-bg)', color: 'var(--accent)' }}>{r.field}</span>
+                  <span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: 4, background: '#f0fdf4', color: '#16a34a' }}>{r.trl}</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>🏛️ {r.institution}</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>📋 {r.ipc}</span>
+                </div>
+              </div>
+              <div style={{ textAlign: 'center', minWidth: 60 }}>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: r.score >= 80 ? '#16a34a' : r.score >= 70 ? '#f59e0b' : '#ef4444' }}>{r.score}</div>
+                <small>综合分</small>
+              </div>
+            </div>
+            {r.tags && <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>{r.tags.map(t => (
+              <span key={t} style={{ fontSize: '0.75rem', padding: '1px 6px', borderRadius: 3, background: 'var(--bg)', color: 'var(--text-secondary)' }}>#{t}</span>
+            ))}</div>}
+            {r.match_score !== undefined && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>匹配度: {(r.match_score * 100).toFixed(0)}%</div>}
+          </div>
+        ))}
+      </div>}
+      {llmAnalysis && <div className="card" style={{ marginTop: 12, borderLeft: '4px solid #8b5cf6' }}>
+        <h4>🤖 AI 深度分析</h4>
+        <p style={{ whiteSpace: 'pre-wrap' }}>{llmAnalysis}</p>
+      </div>}
+    </div>
+  )
+}
+
+// ─── KnowledgeFlow Page (知识图谱) ───
+function KnowledgeFlowPage() {
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<KGResult | null>(null)
+  const [error, setError] = useState('')
+  const [llmLoading, setLlmLoading] = useState(false)
+  const [llmAnalysis, setLlmAnalysis] = useState('')
+  const svgRef = useRef<SVGSVGElement>(null)
+
+  const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault(); setLoading(true); setError(''); setResult(null); setLlmAnalysis('')
+    const fd = new FormData(e.currentTarget)
+    const body = { query: fd.get('query'), depth: 2 }
+    try {
+      const r = await apiPost<KGResult>('/api/knowledge-graph', body)
+      setResult(r); setLoading(false)
+      setLlmLoading(true)
+      streamSSE('/api/llm/knowledge-graph', body, (evt, data) => {
+        if (evt === 'result' && data.analysis) { setLlmAnalysis(data.analysis); setLlmLoading(false) }
+      })
+      setTimeout(() => setLlmLoading(false), 60000)
+    } catch (err: unknown) { setError(err instanceof Error ? err.message : '请求失败') }
+    finally { setLoading(false) }
+  }, [])
+
+  // Simple force-directed layout for graph visualization
+  const nodePositions = useRef<Map<string, { x: number; y: number }>>(new Map())
+  if (result && result.nodes.length > 0 && nodePositions.current.size === 0) {
+    const cx = 300, cy = 200, r = 150
+    result.nodes.forEach((n, i) => {
+      const angle = (2 * Math.PI * i) / result.nodes.length - Math.PI / 2
+      nodePositions.current.set(n.id, { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) })
+    })
+  }
+
+  const typeColors: Record<string, string> = {
+    technology: '#3b82f6', domain: '#8b5cf6', institution: '#10b981', patent: '#f59e0b', layer: '#06b6d4'
+  }
+
+  return (
+    <div className="page-content">
+      <div className="module-header" style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' }}>
+        <h1>🌐 知识图谱 KnowledgeFlow</h1>
+        <p>可视化知识从论文到产品的流动路径 · 内生增长理论</p>
+        {llmLoading && <span className="llm-loading-header">🤖 AI路径分析中...</span>}
+      </div>
+      <form onSubmit={handleSubmit} className="eval-form">
+        <input name="query" placeholder="输入技术关键词（如：联邦学习、差分隐私）*" required className="form-input" />
+        <button type="submit" className="btn-primary" disabled={loading}>{loading ? <Spinner /> : '🌐 探索图谱'}</button>
+      </form>
+      {error && <div className="error-card">{error}</div>}
+      {result && <div className="results-section">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h3>知识图谱 ({result.nodes.length} 节点, {result.edges.length} 关系)</h3>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            {result.source === 'fedctx' ? '🟢 FedCtx 图谱' : '🟡 示例图谱'}
+          </span>
+        </div>
+        {/* Graph SVG Visualization */}
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <svg ref={svgRef} viewBox="0 0 600 400" style={{ width: '100%', height: 400, background: 'var(--bg)' }}>
+            {/* Edges */}
+            {result.edges.map((e, i) => {
+              const s = nodePositions.current.get(e.source)
+              const t = nodePositions.current.get(e.target)
+              if (!s || !t) return null
+              return <g key={`e${i}`}>
+                <line x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke="var(--border)" strokeWidth={1 + e.weight} />
+                <text x={(s.x + t.x) / 2} y={(s.y + t.y) / 2} fontSize={9} fill="var(--text-muted)" textAnchor="middle">{e.label}</text>
+              </g>
+            })}
+            {/* Nodes */}
+            {result.nodes.map(n => {
+              const pos = nodePositions.current.get(n.id)
+              if (!pos) return null
+              const color = typeColors[n.type] || '#6b7280'
+              const size = 12 + n.pagerank * 40
+              return <g key={n.id}>
+                <circle cx={pos.x} cy={pos.y} r={size} fill={color} opacity={0.85} />
+                <text x={pos.x} y={pos.y + size + 14} fontSize={11} fill="var(--text)" textAnchor="middle" fontWeight={600}>{n.label}</text>
+              </g>
+            })}
+          </svg>
+        </div>
+        {/* Legend */}
+        <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+          {Object.entries(typeColors).map(([type, color]) => (
+            <span key={type} style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'inline-block' }} />
+              {type === 'technology' ? '技术' : type === 'domain' ? '领域' : type === 'institution' ? '机构' : type === 'patent' ? '专利' : type}
+            </span>
+          ))}
+        </div>
+        {/* Node list */}
+        <div style={{ marginTop: 12 }}>
+          <h4>📊 节点重要性 (PageRank)</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8, marginTop: 8 }}>
+            {[...result.nodes].sort((a, b) => b.pagerank - a.pagerank).map(n => (
+              <div key={n.id} style={{ padding: '8px 12px', borderRadius: 8, background: 'var(--card)', border: '1px solid var(--border)' }}>
+                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{n.label}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{n.type}</span>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: typeColors[n.type] || '#6b7280' }}>{n.pagerank.toFixed(3)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>}
+      {llmAnalysis && <div className="card" style={{ marginTop: 12, borderLeft: '4px solid #8b5cf6' }}>
+        <h4>🤖 AI 路径分析</h4>
+        <p style={{ whiteSpace: 'pre-wrap' }}>{llmAnalysis}</p>
+      </div>}
+    </div>
+  )
+}
+
+// ─── SupplyChain Page (供应链图谱) ───
+function SupplyChainPage() {
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<SupplyChainResult | null>(null)
+  const [error, setError] = useState('')
+  const [llmLoading, setLlmLoading] = useState(false)
+  const [llmAnalysis, setLlmAnalysis] = useState('')
+
+  const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault(); setLoading(true); setError(''); setResult(null); setLlmAnalysis('')
+    const fd = new FormData(e.currentTarget)
+    const body = { tech_name: fd.get('tech_name'), tech_description: fd.get('tech_description') || '' }
+    try {
+      const r = await apiPost<SupplyChainResult>('/api/supply-chain', body)
+      setResult(r); setLoading(false)
+      setLlmLoading(true)
+      streamSSE('/api/llm/supply-chain', body, (evt, data) => {
+        if (evt === 'result' && data.analysis) { setLlmAnalysis(data.analysis); setLlmLoading(false) }
+      })
+      setTimeout(() => setLlmLoading(false), 60000)
+    } catch (err: unknown) { setError(err instanceof Error ? err.message : '请求失败') }
+    finally { setLoading(false) }
+  }, [])
+
+  const layerColors = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#06b6d4', '#ef4444']
+
+  return (
+    <div className="page-content">
+      <div className="module-header" style={{ background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)' }}>
+        <h1>🔗 供应链图谱 SupplyChain</h1>
+        <p>算法→芯片→ODM→认证全链路匹配 · 内置ODM/传感器/认证机构库</p>
+        {llmLoading && <span className="llm-loading-header">🤖 AI供应链分析中...</span>}
+      </div>
+      <form onSubmit={handleSubmit} className="eval-form">
+        <input name="tech_name" placeholder="技术/产品名称 *（如：联邦学习边缘网关）" required className="form-input" />
+        <textarea name="tech_description" placeholder="技术描述（可选）" rows={2} className="form-input" />
+        <button type="submit" className="btn-primary" disabled={loading}>{loading ? <Spinner /> : '🔗 分析供应链'}</button>
+      </form>
+      {error && <div className="error-card">{error}</div>}
+      {result && result.chain && <div className="results-section">
+        <h3>七层产业链</h3>
+        {/* Supply chain flow visualization */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+          {result.chain.nodes.map((node, i) => {
+            const loc = result.chain.localization?.[node.label] ?? 50
+            const color = layerColors[i % layerColors.length]
+            return <div key={node.id} className="card" style={{ borderLeft: `4px solid ${color}`, padding: '12px 16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h4 style={{ color, marginBottom: 4 }}>{node.label}</h4>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {node.items.map(item => (
+                      <span key={item} style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: 4, background: `${color}15`, color }}>{item}</span>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'center', minWidth: 80 }}>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: loc >= 70 ? '#16a34a' : loc >= 40 ? '#f59e0b' : '#ef4444' }}>{loc}%</div>
+                  <small style={{ color: 'var(--text-muted)' }}>国产化率</small>
+                </div>
+              </div>
+              {/* Localization bar */}
+              <div style={{ marginTop: 8, height: 4, borderRadius: 2, background: 'var(--border)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${loc}%`, background: loc >= 70 ? '#16a34a' : loc >= 40 ? '#f59e0b' : '#ef4444', borderRadius: 2 }} />
+              </div>
+            </div>
+          })}
+        </div>
+        {/* Flow arrows */}
+        <div style={{ marginTop: 16 }}>
+          <h4>🔄 产业链流向</h4>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+            {result.chain.edges.map((e, i) => {
+              const srcNode = result.chain.nodes.find(n => n.id === e.source)
+              const tgtNode = result.chain.nodes.find(n => n.id === e.target)
+              return <span key={i} style={{ fontSize: '0.85rem', padding: '4px 10px', borderRadius: 6, background: 'var(--card)', border: '1px solid var(--border)' }}>
+                {srcNode?.label} → {tgtNode?.label} <span style={{ color: 'var(--text-muted)' }}>({e.label})</span>
+              </span>
+            })}
+          </div>
+        </div>
+      </div>}
+      {llmAnalysis && <div className="card" style={{ marginTop: 12, borderLeft: '4px solid #06b6d4' }}>
+        <h4>🤖 AI 供应链分析</h4>
+        <p style={{ whiteSpace: 'pre-wrap' }}>{llmAnalysis}</p>
+      </div>}
+    </div>
+  )
+}
+
 function StaticModule({ name, nameEn, icon, theory, desc, color }: { id: string; name: string; nameEn: string; icon: string; theory: string; desc: string; color: string }) {
   return (
     <div className="page-content">
@@ -551,7 +833,7 @@ function Footer() {
 export default function App() {
   const [page, setPage] = useState('cover')
   const [dark, setDark] = useState(false)
-  const [auth, setAuth] = useState<AuthState | null>(null)
+  const [auth, _setAuth] = useState<AuthState | null>(null)
   const [fedctxOk, setFedctxOk] = useState<boolean | null>(null)
 
   useEffect(() => {
@@ -566,8 +848,8 @@ export default function App() {
     cover: <CoverPage setPage={setPage} />,
     map: <MapPage />,
     'tt-blindbox': <BlindBoxPage />,
-    'tt-fedmatch': <StaticModule {...TT_MODULES[1]} id="tt-fedmatch" />,
-    'tt-knowledge': <StaticModule {...TT_MODULES[2]} id="tt-knowledge" />,
+    'tt-fedmatch': <FedMatchPage />,
+    'tt-knowledge': <KnowledgeFlowPage />,
     'tt-radar': <StaticModule {...TT_MODULES[3]} id="tt-radar" />,
     'tt-translate': <TechTranslatorPage />,
     'tt-triple': <TripleHelixPage />,
@@ -576,7 +858,7 @@ export default function App() {
     'hw-eval': <HWEvalPage />,
     'hw-translate': <HWTranslatorPage />,
     'hw-quad': <QuadHelixPage />,
-    'hw-supply': <StaticModule {...HW_MODULES[1]} id="hw-supply" />,
+    'hw-supply': <SupplyChainPage />,
     'hw-radar': <StaticModule {...HW_MODULES[4]} id="hw-radar" />,
     'hw-cert': <StaticModule {...HW_MODULES[5]} id="hw-cert" />,
     'hw-proto': <StaticModule {...HW_MODULES[6]} id="hw-proto" />,

@@ -541,6 +541,264 @@ async def serve_favicon():
 async def serve_icons():
     return FileResponse(os.path.join(DIST, "icons.svg"))
 
+# ═══════════════════════════════════════════════════════════════
+# 5. FedMatch — 联邦匹配（FedCtx HNSW + HybridSearch）
+# ═══════════════════════════════════════════════════════════════
+
+class FedMatchRequest(BaseModel):
+    query: str; k: int = 10; doc_id: str = ""
+
+# Sample patent/tech database for fallback
+_PATENT_DB = [
+    {"id": "CN20251001", "title": "基于联邦学习的隐私保护医疗影像分析系统", "field": "医疗AI", "ipc": "G06N", "trl": "TRL6", "score": 82, "institution": "清华大学", "tags": ["联邦学习", "医疗影像", "隐私保护"]},
+    {"id": "CN20251002", "title": "差分隐私驱动的分布式模型聚合方法", "field": "隐私计算", "ipc": "G06N", "trl": "TRL5", "score": 78, "institution": "北京大学", "tags": ["差分隐私", "联邦学习", "模型聚合"]},
+    {"id": "CN20251003", "title": "面向边缘计算的轻量级神经网络架构搜索", "field": "边缘AI", "ipc": "G06N", "trl": "TRL4", "score": 75, "institution": "中科院", "tags": ["边缘计算", "NAS", "轻量级"]},
+    {"id": "CN20251004", "title": "基于知识图谱的科技成果智能推荐系统", "field": "技术转移", "ipc": "G06N", "trl": "TRL5", "score": 80, "institution": "浙江大学", "tags": ["知识图谱", "推荐系统", "技术转移"]},
+    {"id": "CN20251005", "title": "多模态具身智能机器人自主导航方法", "field": "具身智能", "ipc": "G05B", "trl": "TRL4", "score": 76, "institution": "上海交大", "tags": ["具身智能", "导航", "多模态"]},
+    {"id": "CN20251006", "title": "安全聚合协议下的跨机构联邦训练框架", "field": "隐私计算", "ipc": "H04L", "trl": "TRL6", "score": 84, "institution": "南京大学", "tags": ["安全聚合", "联邦训练", "跨机构"]},
+    {"id": "CN20251007", "title": "基于Transformer的专利文本语义匹配方法", "field": "NLP", "ipc": "G06F", "trl": "TRL5", "score": 77, "institution": "复旦大学", "tags": ["Transformer", "语义匹配", "专利"]},
+    {"id": "CN20251008", "title": "面向智能制造的数字孪生联邦学习平台", "field": "智能制造", "ipc": "G05B", "trl": "TRL5", "score": 79, "institution": "华中科大", "tags": ["数字孪生", "联邦学习", "智能制造"]},
+    {"id": "CN20251009", "title": "基于强化学习的机器人灵巧操作控制方法", "field": "具身智能", "ipc": "G05B", "trl": "TRL3", "score": 71, "institution": "哈工大", "tags": ["强化学习", "机器人", "灵巧操作"]},
+    {"id": "CN20251010", "title": "区块链赋能的可信联邦学习数据共享机制", "field": "区块链", "ipc": "H04L", "trl": "TRL4", "score": 73, "institution": "西安交大", "tags": ["区块链", "联邦学习", "可信计算"]},
+]
+
+@app.post("/api/fedmatch")
+async def fedmatch(req: FedMatchRequest):
+    """联邦匹配 — 语义搜索相似技术/专利"""
+    # Try FedCtx hybrid search first
+    if _fedctx_available():
+        try:
+            data = json.dumps({"text": req.query, "k": req.k}).encode()
+            url_req = urllib.request.Request(
+                f"{FEDCTX_URL}/api/text_search", data=data,
+                headers={"Content-Type": "application/json"}, method="POST"
+            )
+            r = urllib.request.urlopen(url_req, timeout=5)
+            resp = json.loads(r.read().decode())
+            results = resp.get("results", [])
+            if results:
+                return {"source": "fedctx", "query": req.query, "results": results, "total": len(results)}
+        except:
+            pass
+
+    # Fallback: keyword matching against patent DB
+    q_lower = req.query.lower()
+    matches = []
+    for p in _PATENT_DB:
+        score = 0.0
+        text = f"{p['title']} {' '.join(p['tags'])} {p['field']}".lower()
+        for word in q_lower.split():
+            if word in text:
+                score += 0.3
+        # Also check individual tags
+        for tag in p["tags"]:
+            if tag in q_lower or q_lower in tag:
+                score += 0.2
+        if score > 0:
+            matches.append({**p, "match_score": round(min(score, 1.0), 2)})
+    matches.sort(key=lambda x: x["match_score"], reverse=True)
+    return {"source": "fallback", "query": req.query, "results": matches[:req.k], "total": len(matches[:req.k])}
+
+
+@app.post("/api/llm/fedmatch")
+async def llm_fedmatch(req: FedMatchRequest):
+    """LLM-enhanced FedMatch — 深度分析匹配结果"""
+    # Get base matches first
+    base = await fedmatch(req)
+    results_text = json.dumps(base["results"][:5], ensure_ascii=False)
+
+    def generate():
+        system = "你是技术转移专家，分析技术匹配结果，给出合作建议和风险评估。用中文回答，简洁专业。"
+        user = f"查询：{req.query}\n匹配结果：{results_text}\n\n请分析：1)最佳匹配及原因 2)合作建议 3)风险提示"
+        result = _llm_sync(system, user)
+        if result:
+            yield _sse("result", {"source": "llm", "analysis": result})
+        yield _sse("done", {})
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+# ═══════════════════════════════════════════════════════════════
+# 6. KnowledgeFlow — 知识图谱（FedCtx KGBuilder + PageRank）
+# ═══════════════════════════════════════════════════════════════
+
+class KGQueryRequest(BaseModel):
+    query: str; depth: int = 2
+
+# Sample knowledge graph data for fallback
+_KG_NODES = [
+    {"id": "fl", "label": "联邦学习", "type": "technology", "pagerank": 0.15},
+    {"id": "dp", "label": "差分隐私", "type": "technology", "pagerank": 0.12},
+    {"id": "sa", "label": "安全聚合", "type": "technology", "pagerank": 0.10},
+    {"id": "kg", "label": "知识图谱", "type": "technology", "pagerank": 0.11},
+    {"id": "ei", "label": "具身智能", "type": "technology", "pagerank": 0.13},
+    {"id": "tt", "label": "技术转移", "type": "domain", "pagerank": 0.09},
+    {"id": "tsinghua", "label": "清华大学", "type": "institution", "pagerank": 0.08},
+    {"id": "pku", "label": "北京大学", "type": "institution", "pagerank": 0.07},
+    {"id": "xjtl", "label": "西交利物浦", "type": "institution", "pagerank": 0.05},
+    {"id": "patent1", "label": "CN20251001", "type": "patent", "pagerank": 0.04},
+    {"id": "patent2", "label": "CN20251006", "type": "patent", "pagerank": 0.06},
+]
+_KG_EDGES = [
+    {"source": "fl", "target": "dp", "label": "uses", "weight": 0.9},
+    {"source": "fl", "target": "sa", "label": "uses", "weight": 0.85},
+    {"source": "fl", "target": "tt", "label": "applied_in", "weight": 0.7},
+    {"source": "dp", "target": "sa", "label": "related_to", "weight": 0.6},
+    {"source": "kg", "target": "tt", "label": "enables", "weight": 0.75},
+    {"source": "ei", "target": "fl", "label": "uses", "weight": 0.5},
+    {"source": "tsinghua", "target": "fl", "label": "researches", "weight": 0.8},
+    {"source": "pku", "target": "dp", "label": "researches", "weight": 0.75},
+    {"source": "xjtl", "target": "tt", "label": "researches", "weight": 0.65},
+    {"source": "patent1", "target": "fl", "label": "belongs_to", "weight": 0.9},
+    {"source": "patent2", "target": "sa", "label": "belongs_to", "weight": 0.85},
+    {"source": "tsinghua", "target": "patent1", "label": "owns", "weight": 0.7},
+    {"source": "pku", "target": "patent2", "label": "owns", "weight": 0.7},
+]
+
+@app.post("/api/knowledge-graph")
+async def knowledge_graph(req: KGQueryRequest):
+    """知识图谱查询 — 返回子图"""
+    # Try FedCtx graph store first
+    if _fedctx_available():
+        try:
+            # Try to traverse from query-matched node
+            data = json.dumps({"text": req.query, "k": 1}).encode()
+            url_req = urllib.request.Request(
+                f"{FEDCTX_URL}/api/text_search", data=data,
+                headers={"Content-Type": "application/json"}, method="POST"
+            )
+            r = urllib.request.urlopen(url_req, timeout=5)
+            resp = json.loads(r.read().decode())
+            results = resp.get("results", [])
+            if results and results[0].get("id"):
+                node_id = results[0]["id"]
+                # Traverse graph from this node
+                try:
+                    r2 = urllib.request.urlopen(
+                        f"{FEDCTX_URL}/api/graph/traverse?start_id={node_id}&max_hops={req.depth}",
+                        timeout=5
+                    )
+                    graph_resp = json.loads(r2.read().decode())
+                    return {"source": "fedctx", "query": req.query, **graph_resp}
+                except:
+                    pass
+        except:
+            pass
+
+    # Fallback: filter sample graph by query
+    q_lower = req.query.lower()
+    matched_node_ids = set()
+    for n in _KG_NODES:
+        if q_lower in n["label"].lower() or n["label"].lower() in q_lower:
+            matched_node_ids.add(n["id"])
+
+    # If no direct match, return full graph
+    if not matched_node_ids:
+        matched_node_ids = {n["id"] for n in _KG_NODES}
+
+    # Expand to neighbors within depth
+    for _ in range(req.depth):
+        new_ids = set()
+        for e in _KG_EDGES:
+            if e["source"] in matched_node_ids:
+                new_ids.add(e["target"])
+            if e["target"] in matched_node_ids:
+                new_ids.add(e["source"])
+        matched_node_ids |= new_ids
+
+    nodes = [n for n in _KG_NODES if n["id"] in matched_node_ids]
+    edges = [e for e in _KG_EDGES if e["source"] in matched_node_ids and e["target"] in matched_node_ids]
+
+    return {"source": "fallback", "query": req.query, "nodes": nodes, "edges": edges}
+
+
+@app.post("/api/llm/knowledge-graph")
+async def llm_knowledge_graph(req: KGQueryRequest):
+    """LLM-enhanced KG — 解读知识图谱路径"""
+    base = await knowledge_graph(req)
+    graph_text = f"节点: {json.dumps(base.get('nodes', []), ensure_ascii=False)}\n边: {json.dumps(base.get('edges', []), ensure_ascii=False)}"
+
+    def generate():
+        system = "你是知识图谱分析专家，解读技术知识图谱中的关键路径和关联。用中文回答，简洁专业。"
+        user = f"查询：{req.query}\n图谱数据：{graph_text}\n\n请分析：1)核心技术路径 2)关键节点 3)潜在合作机会"
+        result = _llm_sync(system, user)
+        if result:
+            yield _sse("result", {"source": "llm", "analysis": result})
+        yield _sse("done", {})
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+# ═══════════════════════════════════════════════════════════════
+# 7. SupplyChain — 供应链图谱（FedCtx KGBuilder + GraphStore）
+# ═══════════════════════════════════════════════════════════════
+
+class SupplyChainRequest(BaseModel):
+    tech_name: str; tech_description: str = ""
+
+# Sample supply chain data for fallback
+_SUPPLY_CHAIN = {
+    "nodes": [
+        {"id": "algo", "label": "算法层", "type": "layer", "items": ["联邦学习框架", "差分隐私引擎", "安全聚合协议"]},
+        {"id": "chip", "label": "芯片层", "type": "layer", "items": ["寒武纪MLU", "华为昇腾", "地平线J5", "瑞芯微RK3588"]},
+        {"id": "odm", "label": "ODM层", "type": "layer", "items": ["富士康", "和硕", "闻泰科技", "华勤"]},
+        {"id": "cert", "label": "认证层", "type": "layer", "items": ["3C认证", "SRRC认证", "算法备案", "CE/FCC"]},
+        {"id": "sensor", "label": "传感器层", "type": "layer", "items": ["摄像头模组", "IMU", "激光雷达", "毫米波雷达"]},
+        {"id": "market", "label": "市场层", "type": "layer", "items": ["智能制造", "医疗AI", "自动驾驶", "智慧城市"]},
+    ],
+    "edges": [
+        {"source": "algo", "target": "chip", "label": "部署于"},
+        {"source": "chip", "target": "sensor", "label": "接入"},
+        {"source": "chip", "target": "odm", "label": "集成于"},
+        {"source": "odm", "target": "cert", "label": "需通过"},
+        {"source": "cert", "target": "market", "label": "进入"},
+        {"source": "sensor", "target": "odm", "label": "供应给"},
+    ],
+    "localization": {
+        "算法层": 85, "芯片层": 35, "ODM层": 90, "认证层": 95,
+        "传感器层": 40, "市场层": 80,
+    }
+}
+
+@app.post("/api/supply-chain")
+async def supply_chain(req: SupplyChainRequest):
+    """供应链图谱 — 算法→芯片→ODM→认证全链路"""
+    # Try FedCtx graph store
+    if _fedctx_available():
+        try:
+            data = json.dumps({"text": req.tech_name, "k": 5}).encode()
+            url_req = urllib.request.Request(
+                f"{FEDCTX_URL}/api/text_search", data=data,
+                headers={"Content-Type": "application/json"}, method="POST"
+            )
+            r = urllib.request.urlopen(url_req, timeout=5)
+            resp = json.loads(r.read().decode())
+            results = resp.get("results", [])
+            if results:
+                return {"source": "fedctx", "query": req.tech_name, "results": results, "chain": _SUPPLY_CHAIN}
+        except:
+            pass
+
+    # Fallback: return sample supply chain with tech-specific recommendations
+    return {"source": "fallback", "query": req.tech_name, "chain": _SUPPLY_CHAIN}
+
+
+@app.post("/api/llm/supply-chain")
+async def llm_supply_chain(req: SupplyChainRequest):
+    """LLM-enhanced SupplyChain — 供应链分析与推荐"""
+    chain_text = json.dumps(_SUPPLY_CHAIN, ensure_ascii=False)
+
+    def generate():
+        system = "你是硬件供应链专家，分析技术产品的供应链匹配和风险。用中文回答，简洁专业。"
+        user = f"技术：{req.tech_name}\n描述：{req.tech_description}\n供应链数据：{chain_text}\n\n请分析：1)推荐芯片方案 2)供应链风险 3)国产化建议 4)认证路径"
+        result = _llm_sync(system, user)
+        if result:
+            yield _sse("result", {"source": "llm", "analysis": result})
+        yield _sse("done", {})
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
 # Mount assets last
 if os.path.isdir(os.path.join(DIST, "assets")):
     app.mount("/assets", StaticFiles(directory=os.path.join(DIST, "assets")), name="assets")

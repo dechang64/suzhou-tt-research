@@ -50,3 +50,27 @@ export interface EvaluationRecord {
   id: number; type: string; input: Record<string,unknown>;
   result: Record<string,unknown>; source: string; created_at: string;
 }
+
+export interface FedMatchResult {
+  source: string; query: string; total: number;
+  results: Array<{
+    id: string; title: string; field: string; ipc: string;
+    trl: string; score: number; institution: string;
+    tags: string[]; match_score?: number;
+  }>;
+}
+
+export interface KGResult {
+  source: string; query: string;
+  nodes: Array<{ id: string; label: string; type: string; pagerank: number }>;
+  edges: Array<{ source: string; target: string; label: string; weight: number }>;
+}
+
+export interface SupplyChainResult {
+  source: string; query: string;
+  chain: {
+    nodes: Array<{ id: string; label: string; type: string; items: string[] }>;
+    edges: Array<{ source: string; target: string; label: string }>;
+    localization: Record<string, number>;
+  };
+}
