@@ -140,21 +140,10 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ─── Sidebar ───
+# ─── Sidebar (顶部项目信息; multipage app 链接 streamlit 自动生成) ───
 with st.sidebar:
     st.markdown("### 🚀 TT-OPC 镜像版")
     st.caption("suzhou-tt-research 镜像版")
-    st.markdown("---")
-    st.markdown("**📚 快速导航**")
-    st.markdown("""
-- 🏠 **本页：项目总览**
-- 🧠 **理论地图** （左侧导航）
-- 📦 **TT-OPC 8 模块** （左侧导航）
-- 📊 **HW-OPC 9 模块** （左侧导航）
-- 🌏 **国际案例** （左侧导航）
-- 📚 **成果汇编** （左侧导航）
-- 🗺️ **区域热力图** （左侧导航）
-""")
     st.markdown("---")
     st.markdown("**🔗 原始项目**")
     st.markdown("""
