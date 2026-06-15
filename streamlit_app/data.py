@@ -4,6 +4,7 @@ TT-OPC 共享数据层
 让 Streamlit 镜像版可独立运行 (不依赖 FastAPI 后端启动)
 """
 from typing import List, Dict, Any
+from dataclasses import dataclass, field
 
 # ─── 12 个经济学理论（从 data.ts 翻译） ───
 THEORIES = [

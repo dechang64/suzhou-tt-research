@@ -31,10 +31,10 @@ def render():
     st.markdown('### 📈 关键评审指标')
     metrics_cols = st.columns(4)
     with metrics_cols[0]:
-        st.metric('完成稿修改', '9 项', delta=9, delta_color='normal')
+        st.metric('完成稿修改', '9 项', delta='v5 顶刊标准', delta_color='normal')
     with metrics_cols[1]:
-        st.metric('党刊评分', '62/70', delta=18, delta_color='normal')
+        st.metric('党刊评分', '62/70', delta='+18 (v3→v5)', delta_color='normal')
     with metrics_cols[2]:
-        st.metric('决策参阅评分', '64/100', delta=12, delta_color='normal')
+        st.metric('决策参阅评分', '64/100', delta='+12 (v13→v14)', delta_color='normal')
     with metrics_cols[3]:
-        st.metric('MD5 验证', '7/7', delta=100, delta_color='normal')
+        st.metric('MD5 验证', '7/7', delta='100% 一致', delta_color='normal')
