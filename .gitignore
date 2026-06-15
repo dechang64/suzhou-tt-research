@@ -1,7 +1,8 @@
-node_modules/
-dist/
-__pycache__/
+*.log
 *.pyc
 .env
-*.log
+.venv/
+__pycache__/
 data/tt_opc.db
+dist/
+node_modules/

@@ -34,7 +34,7 @@ def _llm_sync(system_prompt: str, user_prompt: str) -> Optional[str]:
             output = result.stdout.strip()
             lines = [l for l in output.split("\n") if l.strip() and not l.startswith("\U0001f680")]
             return "\n".join(lines) or None
-    except:
+    except Exception:
         pass
     return None
 
@@ -47,7 +47,7 @@ def _extract_json(raw: str) -> Optional[dict]:
     try:
         m = re.search(r'\{[\s\S]*\}', raw)
         if m: return json.loads(m.group())
-    except: pass
+    except Exception: pass
     return None
 
 def sse(data: dict, event: str = "data") -> str:
@@ -80,7 +80,7 @@ async def blindbox(req: BlindBoxRequest):
         try:
             search_text = f"{req.tech_name} {req.tech_field} {req.tech_description}"
             similar = _fedctx_search(search_text, k=5)
-        except:
+        except Exception:
             pass
 
     # Base fallback scores (field-aware)
@@ -171,7 +171,7 @@ async def hw_eval(req: HWEvalRequest):
         try:
             similar = _fedctx_search(f"硬件评估 {req.tech_name}", k=3)
             similar_count = len(similar)
-        except:
+        except Exception:
             pass
 
     return {
@@ -368,7 +368,7 @@ def _fedctx_available() -> bool:
     try:
         r = urllib.request.urlopen(f"{FEDCTX_URL}/health", timeout=2)
         return r.status == 200
-    except:
+    except Exception:
         return False
 
 def _fedctx_insert(eval_id: str, text: str, metadata: dict) -> bool:
@@ -388,7 +388,7 @@ def _fedctx_insert(eval_id: str, text: str, metadata: dict) -> bool:
         req = urllib.request.Request(f"{FEDCTX_URL}/api/vectors", data=data, headers={"Content-Type": "application/json"}, method="POST")
         r = urllib.request.urlopen(req, timeout=5)
         return r.status == 200
-    except:
+    except Exception:
         return False
 
 def _fedctx_search(text: str, k: int = 10) -> list:
@@ -399,7 +399,7 @@ def _fedctx_search(text: str, k: int = 10) -> list:
         r = urllib.request.urlopen(req, timeout=5)
         resp = json.loads(r.read().decode())
         return resp.get("results", [])
-    except:
+    except Exception:
         return []
 
 def _fedctx_stats() -> dict:
@@ -407,7 +407,7 @@ def _fedctx_stats() -> dict:
     try:
         r = urllib.request.urlopen(f"{FEDCTX_URL}/api/stats", timeout=2)
         return json.loads(r.read().decode())
-    except:
+    except Exception:
         return {"total_vectors": 0, "dimension": 0, "available": False}
 
 # SQLite only for users/auth (FedCtx doesn't do auth)
@@ -555,7 +555,7 @@ def _verify_token(token: str) -> Optional[dict]:
         payload = json.loads(base64.urlsafe_b64decode(parts[1] + "=" * padding))
         if datetime.fromisoformat(payload["exp"]) < datetime.now(): return None
         return payload
-    except:
+    except Exception:
         return None
 
 class LoginRequest(BaseModel):
@@ -652,7 +652,7 @@ async def fedmatch(req: FedMatchRequest):
             results = resp.get("results", [])
             if results:
                 return {"source": "fedctx", "query": req.query, "results": results, "total": len(results)}
-        except:
+        except Exception:
             pass
 
     # Fallback: keyword matching against patent DB
@@ -754,9 +754,9 @@ async def knowledge_graph(req: KGQueryRequest):
                     )
                     graph_resp = json.loads(r2.read().decode())
                     return {"source": "fedctx", "query": req.query, **graph_resp}
-                except:
+                except Exception:
                     pass
-        except:
+        except Exception:
             pass
 
     # Fallback: filter sample graph by query
@@ -850,7 +850,7 @@ async def supply_chain(req: SupplyChainRequest):
             results = resp.get("results", [])
             if results:
                 return {"source": "fedctx", "query": req.tech_name, "results": results, "chain": _SUPPLY_CHAIN}
-        except:
+        except Exception:
             pass
 
     # Fallback: return sample supply chain with tech-specific recommendations
@@ -905,7 +905,7 @@ async def tech_radar(req: TechRadarRequest):
             resp = json.loads(r.read().decode())
             for item in resp.get("results", []):
                 pagerank_data[item.get("id", "")] = item.get("score", 0)
-        except:
+        except Exception:
             pass
 
     # Filter by field if specified
@@ -968,7 +968,7 @@ async def innovation_thermo():
         try:
             stats = _fedctx_stats()
             total_vectors = stats.get("total_vectors", 0)
-        except:
+        except Exception:
             pass
 
     return {
