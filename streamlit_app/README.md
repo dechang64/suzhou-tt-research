@@ -24,18 +24,21 @@
 
 ```
 streamlit_app/
-├── app.py                          # 主页（项目总览）
-├── data.py                         # 共享数据层（12 理论 + 6 案例 + 17 模块）
-├── requirements.txt                # 依赖（仅 streamlit + pandas）
+├── app.py                          # 入口 + st.navigation() 调度 7 个 page
+├── _home.py                        # 主页函数 home() + 自定义 sidebar custom_sidebar()
+├── data.py                         # 共享数据层（12 理论 + 6 国内 + 4 国际 + 17 模块）
+├── requirements.txt                # 依赖（streamlit + pandas + matplotlib）
 ├── README.md                       # 本文件
-└── pages/
-    ├── 1_🧠_理论地图.py            # 12 个经济学理论详解
-    ├── 2_📦_TT_OPC.py              # 8 个软件模块详情
-    ├── 3_📊_HW_OPC.py              # 9 个硬件模块详情
-    ├── 4_🌏_国际案例.py            # 4 国际 + 6 国内标杆
-    ├── 5_📚_成果汇编.py            # 5 项已发表/在投成果
-    └── 6_🗺️_区域热力图.py          # 31 省技术转移数据
+└── pages_pages/                    # 6 个独立 page 模块（不放在 pages/ 目录, 避免 streamlit 自动发现)
+    ├── TheoryMap_1.py              # 12 个经济学理论详解
+    ├── TT_OPC_2.py                 # 8 个软件模块详情
+    ├── HW_OPC_3.py                 # 9 个硬件模块详情
+    ├── IntlCases_4.py              # 4 国际 + 6 国内标杆
+    ├── Publications_5.py           # 5 项已发表/在投成果
+    └── Heatmap_6.py                # 31 省技术转移数据
 ```
+
+**架构说明**：使用 `st.navigation()` 接管路由 + 自定义 sidebar（`st.sidebar.page_link`），避免 streamlit 默认的 `pages/` 目录自动发现 + 默认 sidebar 导航不可控。
 
 ## 🚀 本地运行
 
