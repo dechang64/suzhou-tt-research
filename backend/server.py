@@ -616,7 +616,7 @@ async def serve_icons():
     return FileResponse(os.path.join(DIST, "icons.svg"))
 
 # ═══════════════════════════════════════════════════════════════
-# 5. FedMatch — 联邦匹配（FedCtx HNSW + HybridSearch）
+# 5. FedMatch — 联邦匹配（FedCtx HNSW + TF-IDF Fallback）
 # ═══════════════════════════════════════════════════════════════
 
 class FedMatchRequest(BaseModel):
@@ -634,11 +634,51 @@ _PATENT_DB = [
     {"id": "CN20251008", "title": "面向智能制造的数字孪生联邦学习平台", "field": "智能制造", "ipc": "G05B", "trl": "TRL5", "score": 79, "institution": "华中科大", "tags": ["数字孪生", "联邦学习", "智能制造"]},
     {"id": "CN20251009", "title": "基于强化学习的机器人灵巧操作控制方法", "field": "具身智能", "ipc": "G05B", "trl": "TRL3", "score": 71, "institution": "哈工大", "tags": ["强化学习", "机器人", "灵巧操作"]},
     {"id": "CN20251010", "title": "区块链赋能的可信联邦学习数据共享机制", "field": "区块链", "ipc": "H04L", "trl": "TRL4", "score": 73, "institution": "西安交大", "tags": ["区块链", "联邦学习", "可信计算"]},
+    {"id": "CN20251011", "title": "RISC-V向量处理器IP核", "field": "电子信息", "ipc": "G06F", "trl": "TRL4", "score": 81, "institution": "西交利物浦", "tags": ["RISC-V", "向量处理器", "自主可控"]},
+    {"id": "CN20251012", "title": "光互连与光计算芯片", "field": "电子信息", "ipc": "G02F", "trl": "TRL3", "score": 85, "institution": "西交利物浦", "tags": ["光芯片", "光互连", "光计算"]},
 ]
+
+# ─── TF-IDF 向量化引擎 ───
+import math as _math
+from collections import Counter as _Counter
+import re as _re
+
+def _tokenize(text):
+    return _re.findall(r'[a-zA-Z]+|[\u4e00-\u9fff]', text.lower())
+
+def _build_tfidf(corpus):
+    N = len(corpus)
+    df = _Counter()
+    doc_tokens = []
+    for doc in corpus:
+        tokens = _tokenize(doc)
+        doc_tokens.append(tokens)
+        for t in set(tokens):
+            df[t] += 1
+    idf = {t: _math.log(N / (1 + df_t)) for t, df_t in df.items()}
+    return idf
+
+def _vectorize(text, idf):
+    tokens = _tokenize(text)
+    tf = _Counter(tokens)
+    return {t: count * idf.get(t, 0) for t, count in tf.items()}
+
+def _cosine_sim(v1, v2):
+    if not v1 or not v2:
+        return 0.0
+    dot = sum(v1[t] * v2.get(t, 0) for t in v1)
+    n1 = _math.sqrt(sum(v * v for v in v1.values()))
+    n2 = _math.sqrt(sum(v * v for v in v2.values()))
+    return dot / (n1 * n2) if n1 > 0 and n2 > 0 else 0.0
+
+# Build global IDF for patent DB
+_PATENT_TEXTS = [f"{p['title']} {' '.join(p['tags'])} {p['field']}" for p in _PATENT_DB]
+_GLOBAL_IDF = _build_tfidf(_PATENT_TEXTS)
+_PATENT_VECS = [_vectorize(t, _GLOBAL_IDF) for t in _PATENT_TEXTS]
 
 @app.post("/api/fedmatch")
 async def fedmatch(req: FedMatchRequest):
-    """联邦匹配 — 语义搜索相似技术/专利"""
+    """联邦匹配 — 语义搜索相似技术/专利（TF-IDF向量匹配 + FedCtx增强）"""
     # Try FedCtx hybrid search first
     if _fedctx_available():
         try:
@@ -655,23 +695,16 @@ async def fedmatch(req: FedMatchRequest):
         except Exception:
             pass
 
-    # Fallback: keyword matching against patent DB
-    q_lower = req.query.lower()
+    # Fallback: TF-IDF vector matching against patent DB
+    q_vec = _vectorize(req.query, _GLOBAL_IDF)
     matches = []
-    for p in _PATENT_DB:
-        score = 0.0
-        text = f"{p['title']} {' '.join(p['tags'])} {p['field']}".lower()
-        for word in q_lower.split():
-            if word in text:
-                score += 0.3
-        # Also check individual tags
-        for tag in p["tags"]:
-            if tag in q_lower or q_lower in tag:
-                score += 0.2
-        if score > 0:
-            matches.append({**p, "match_score": round(min(score, 1.0), 2)})
+    for i, p in enumerate(_PATENT_DB):
+        sim = _cosine_sim(q_vec, _PATENT_VECS[i])
+        if sim > 0:
+            score = round(min(98, max(40, sim * 200)))
+            matches.append({**p, "match_score": round(sim, 4), "score": score})
     matches.sort(key=lambda x: x["match_score"], reverse=True)
-    return {"source": "fallback", "query": req.query, "results": matches[:req.k], "total": len(matches[:req.k])}
+    return {"source": "tfidf", "query": req.query, "results": matches[:req.k], "total": len(matches[:req.k])}
 
 
 @app.post("/api/llm/fedmatch")

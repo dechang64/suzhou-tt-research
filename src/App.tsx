@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import './App.css'
-import { TT_MODULES, HW_MODULES, API_BASE } from './data'
+import { TT_MODULES, HW_MODULES, API_BASE, INTLCASES } from './data'
 import type { BlindBoxResult, TripleHelixResult, HWEvalResult, QuadHelixResult, MapProvince, AuthState, FedMatchResult, KGResult, SupplyChainResult, TechRadarResult, InnovationThermoResult, HWRadarResult, CertNavResult, PrototypingResult, SocialHubResult, SocialTradeResult } from './types'
 
 // ─── API helpers ───
@@ -56,7 +56,7 @@ function Nav({ page, setPage, dark, setDark, auth, fedctxOk }: { page: string; s
     { label: '首页', items: [{ id: 'cover', name: '🏠 首页' }, { id: 'map', name: '🗺️ 区域热力图' }] },
     { label: 'TT-OPC', items: TT_MODULES.map(m => ({ id: m.id, name: `${m.icon} ${m.name}` })) },
     { label: 'HW-OPC', items: HW_MODULES.map(m => ({ id: m.id, name: `${m.icon} ${m.name}` })) },
-    { label: '更多', items: [{ id: 'history', name: '📋 评估历史' }, { id: 'book', name: '📖 书籍' }, { id: 'intl', name: '🌏 国际案例' }] },
+    { label: '更多', items: [{ id: 'framework', name: '🏗️ 双平台+三生态' }, { id: 'history', name: '📋 评估历史' }, { id: 'book', name: '📖 书籍' }, { id: 'intl', name: '🌏 国际案例' }] },
   ]
   return (
     <nav className="topbar">
@@ -1331,7 +1331,151 @@ function HistoryPage() {
 
 // ─── Book & Intl Pages (simplified) ───
 function BookPage() { return <div className="page-content"><div className="module-header" style={{ background: 'linear-gradient(135deg, #c9a227 0%, #a08020 100%)' }}><h1>📖 AI for TT-OPC</h1><p>技术转移一人公司全链路指南</p></div><div className="card"><p>9章+附录，覆盖OPC模式认知、AI工具应用、成功案例、法律合规、可持续发展等主题。</p><p style={{ marginTop: 8 }}><a href="https://github.com/dechang64/AI-for-TT-OPC" target="_blank">GitHub仓库</a></p></div></div> }
-function IntlPage() { return <div className="page-content"><div className="module-header" style={{ background: 'linear-gradient(135deg, #e8521a 0%, #c44116 100%)' }}><h1>🌏 国际案例</h1><p>全球技术转移最佳实践</p></div><div className="card"><p>波士顿三螺旋模式、德国Fraunhofer、以色列Yozma、日本TLO等国际经验。</p></div></div> }
+function FrameworkPage() {
+  const platforms = [
+    { icon: '🔬', name: '江苏省数据科学与认知计算工程研究中心', tag: '研发平台', desc: '2020年12月经江苏省发改委批准设立，23名全职专家（100%博士），配备近百张GPU卡超算平台。负责前沿技术攻关和专利布局——"从0到1"。', color: '#3b82f6' },
+    { icon: '🤖', name: '苏州市具身智能未来教育概念验证中心', tag: '验证平台', desc: '苏州市科技局批准，西浦AI学院+智能工程学院联合百度、友达光电共建。440m²实验场所+500m²融创工坊，负责原型验证和场景测试——"从1到10"。', color: '#8b5cf6' },
+  ]
+  const ecosystems = [
+    { icon: '📜', name: '领创知识产权运营协会', tag: '信任底座', desc: '为OPC创业者提供专利导航、知识产权评估、技术交易合规等服务。以制度化体系为创业者增信，破解"信任赤字"。', theory: 'Coase交易成本理论', color: '#ef4444' },
+    { icon: '🔗', name: 'AI创新联合体', tag: '资源通道', desc: '西浦与百度联合发起，国内少有的高校牵头、大厂深度参与模式。跨学科、跨行业开放属性，为OPC创业者打通"大厂资源可获取、高校智力可调用"双向通道。', theory: '三螺旋理论', color: '#6366f1' },
+    { icon: '📚', name: '西浦融创书院', tag: '传播生态', desc: '与坐忘书房合作共建，定位为城市人工智能会客厅。定期举办AI技术沙龙、OPC创业分享会，让技术走出实验室、走进城市生活。', theory: '网络效应', color: '#14b8a6' },
+  ]
+  const policies = [
+    { date: '2025.11', event: '首届人工智能OPC大会', detail: '"四个100"+揭榜挂帅102项/7亿元+1100亿基金+5700亿授信' },
+    { date: '2025.12', event: '"138"计划+百个百万梦想基金池', detail: '单企业最高300万天使基金；OPC三年行动计划（2025-2028），目标1万OPC人才' },
+    { date: '2026.07', event: 'WAIC 2026首次设立OPC专区', detail: '180家一人公司参展；沪苏OPC生态合作签约（场景互通、人才互认、生态互鉴）' },
+    { date: '2026.07', event: '华芯云睿完成天使轮融资', detail: '西浦首个教授创业项目，哇牛资本+善达投资领投，领军创投跟投，验证OPC全链路闭环' },
+  ]
+  const intlCompare = [
+    { aspect: '改革路径', suzhou: '自下而上搭建生态', us: '自上而下重构体系' },
+    { aspect: '敏捷团队', suzhou: '双平台共享+三角色工作台', us: 'X-Labs（10-100人）' },
+    { aspect: '资源打通', suzhou: 'AI创新联合体（高校+大厂）', us: 'Genesis Mission（17个国家实验室）' },
+    { aspect: '信任机制', suzhou: '知识产权运营协会增信', us: '"黄金票"评审机制' },
+    { aspect: '验证体系', suzhou: '概念验证中心', us: '"科学验证器"（设想中）' },
+  ]
+
+  return (
+    <div className="page-content">
+      <div className="module-header" style={{ background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)' }}>
+        <h1>🏗️ 双平台+三生态</h1>
+        <p>苏州以"双平台+三生态"驱动科技成果转化的实践探索 · 与白宫《科学：一个新的黄金时代》跨洋呼应</p>
+      </div>
+
+      {/* 双平台 */}
+      <div className="card">
+        <h2 style={{ marginBottom: 12 }}>🔧 双平台 — 研发+验证接力</h2>
+        <p style={{ color: '#636e72', marginBottom: 16 }}>两大平台形成"研发—验证"接力，让OPC创业者"零成本"接入顶级实验环境</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+          {platforms.map(p => (
+            <div key={p.name} className="card" style={{ borderTop: `4px solid ${p.color}`, margin: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 28 }}>{p.icon}</span>
+                <span style={{ background: p.color, color: '#fff', padding: '2px 10px', borderRadius: 12, fontSize: 12 }}>{p.tag}</span>
+              </div>
+              <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>{p.name}</h3>
+              <p style={{ color: '#636e72', fontSize: 14, margin: 0 }}>{p.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 三生态 */}
+      <div className="card">
+        <h2 style={{ marginBottom: 12 }}>🌐 三生态 — 破解信任赤字+能力鸿沟</h2>
+        <p style={{ color: '#636e72', marginBottom: 16 }}>三大生态支撑为OPC创业者破解"信任赤字"、补齐"能力短板"</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+          {ecosystems.map(e => (
+            <div key={e.name} className="card" style={{ borderTop: `4px solid ${e.color}`, margin: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 28 }}>{e.icon}</span>
+                <span style={{ background: e.color, color: '#fff', padding: '2px 10px', borderRadius: 12, fontSize: 12 }}>{e.tag}</span>
+              </div>
+              <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>{e.name}</h3>
+              <p style={{ color: '#636e72', fontSize: 14, margin: '0 0 8px' }}>{e.desc}</p>
+              <span style={{ fontSize: 12, color: e.color }}>📐 {e.theory}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 政策时间线 */}
+      <div className="card">
+        <h2 style={{ marginBottom: 12 }}>📅 政策与事件时间线</h2>
+        <div style={{ position: 'relative', paddingLeft: 24, borderLeft: '3px solid #dc2626' }}>
+          {policies.map((p, i) => (
+            <div key={i} style={{ position: 'relative', marginBottom: 20 }}>
+              <div style={{ position: 'absolute', left: -31, top: 4, width: 12, height: 12, borderRadius: '50%', background: '#dc2626', border: '2px solid #fff' }} />
+              <div style={{ fontWeight: 700, color: '#dc2626', fontSize: 14 }}>{p.date}</div>
+              <div style={{ fontWeight: 600, fontSize: 15, margin: '4px 0' }}>{p.event}</div>
+              <div style={{ color: '#636e72', fontSize: 13 }}>{p.detail}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 国际对比 */}
+      <div className="card">
+        <h2 style={{ marginBottom: 12 }}>🌏 中美跨洋对照：苏州 vs 白宫报告</h2>
+        <p style={{ color: '#636e72', marginBottom: 16 }}>2026年7月白宫发布《科学：一个新的黄金时代》，与苏州"双平台+三生态"回答同一时代命题</p>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+          <thead>
+            <tr style={{ background: '#f8f9fa' }}>
+              <th style={{ padding: '10px 12px', textAlign: 'left', borderBottom: '2px solid #dee2e6' }}>维度</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left', borderBottom: '2px solid #dee2e6' }}>苏州"双平台+三生态"</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left', borderBottom: '2px solid #dee2e6' }}>白宫《新的黄金时代》</th>
+            </tr>
+          </thead>
+          <tbody>
+            {intlCompare.map((r, i) => (
+              <tr key={i} style={{ borderBottom: '1px solid #e9ecef' }}>
+                <td style={{ padding: '10px 12px', fontWeight: 600 }}>{r.aspect}</td>
+                <td style={{ padding: '10px 12px', color: '#3b82f6' }}>{r.suzhou}</td>
+                <td style={{ padding: '10px 12px', color: '#f59e0b' }}>{r.us}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function IntlPage() {
+  const cases = INTLCASES
+  return (
+    <div className="page-content">
+      <div className="module-header" style={{ background: 'linear-gradient(135deg, #e8521a 0%, #c44116 100%)' }}>
+        <h1>🌏 国际案例</h1>
+        <p>全球技术转移最佳实践 · 含白宫2026年最新报告对照</p>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16 }}>
+        {cases.map((c, i) => (
+          <div key={i} className="card" style={{ borderTop: `4px solid ${c.color}`, margin: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+              <div>
+                <span style={{ fontSize: 12, color: c.color, fontWeight: 700 }}>{c.country}</span>
+                <h3 style={{ margin: '4px 0 2px', fontSize: 16 }}>{c.name}</h3>
+                <span style={{ fontSize: 13, color: '#636e72' }}>{c.model}</span>
+              </div>
+            </div>
+            <ul style={{ margin: '8px 0', paddingLeft: 20, fontSize: 13, color: '#2d3436' }}>
+              {c.keyPoints.map((p, j) => <li key={j} style={{ marginBottom: 4 }}>{p}</li>)}
+            </ul>
+            <div style={{ display: 'flex', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
+              {c.metrics.map((m, j) => (
+                <div key={j} style={{ background: '#f8f9fa', padding: '6px 12px', borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, color: '#636e72' }}>{m.label}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: c.color }}>{m.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 // ─── Footer ───
 function Footer() {
@@ -1373,6 +1517,7 @@ export default function App() {
     'hw-proto': <PrototypingPage />,
     'hw-social-trade': <SocialTradePage />,
     history: <HistoryPage />,
+    framework: <FrameworkPage />,
     book: <BookPage />,
     intl: <IntlPage />,
   }

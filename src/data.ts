@@ -11,7 +11,8 @@ export const THEORIES: Theory[] = [
   { id: 'absorptive', name: '吸收能力理论', nameEn: 'Absorptive Capacity', author: 'Cohen & Levinthal', year: '1990', category: 'classical', summary: '企业识别、消化、应用外部知识的能力决定了技术转移的成功率。场景翻译降低吸收门槛。', relevance: '场景翻译模块将技术语言翻译为投资人/CEO/院长版，本质上是提升买方吸收能力。', color: '#ec4899', icon: '🔄' },
   { id: 'network', name: '网络效应', nameEn: 'Network Effects', author: 'Metcalfe', year: '1995', category: 'modern', summary: '网络的价值与用户数的平方成正比。社交传播交易模块利用网络效应扩大技术影响力。', relevance: 'SocialHub模块连接OPC社区，用户越多，匹配效率越高，形成正向飞轮。', color: '#14b8a6', icon: '🌐' },
   { id: 'fed', name: '联邦学习经济学', nameEn: 'Federated Learning Economics', author: 'McMahan et al.', year: '2017', category: 'modern', summary: '数据不动模型动——在保护隐私的前提下实现跨机构协作。联邦匹配模块的底层逻辑。', relevance: 'FedMatch模块让高校专利数据不出校就能匹配需求方，是联邦学习在技术转移的应用。', color: '#8b5cf6', icon: '🔗' },
-  { id: 'us-ai', name: '美国AI政策框架（2026）', nameEn: 'US National AI Policy Framework', author: 'NSTC', year: '2026', category: 'policy', summary: '联邦数据集以AI-ready格式开放，能源部应用此机制使新材料研发周期缩短40%。', relevance: '借鉴此框架，苏州可建立技术供需信息标准化格式，打通"数据孤岛"。', color: '#f59e0b', icon: '🇺🇸' },
+  { id: 'us-ai', name: '美国《科学：一个新的黄金时代》（2026）', nameEn: 'Science: A New Golden Age', author: 'OSTP (Kratsios)', year: '2026', category: 'policy', summary: '2026年7月白宫发布123页报告，以1945年《科学：无尽的前沿》为参照，提出X-Labs（10-100人敏捷团队）、"黄金票"评审机制、Genesis Mission连接17个国家实验室等改革，试图打破"线性模型"，打通科研与产业壁垒。', relevance: '与苏州"双平台+三生态"形成跨洋呼应——美国自上而下重构体系，苏州自下而上搭建生态，回答同一时代命题。', color: '#f59e0b', icon: '🇺🇸' },
+  { id: 'dual-platform', name: '双平台+三生态', nameEn: 'Dual-Platform + Triple-Ecosystem', author: '西交利物浦大学', year: '2025', category: 'regional', summary: '工程研究中心+概念验证中心双平台提供研发-验证接力，知识产权运营+创新联合体+融创书院三生态破解信任赤字和能力鸿沟，系统性支撑OPC科技成果转化。', relevance: '苏州OPC实践的核心框架——平台共享降低硬件门槛，生态协同破解信任赤字，政策体系形成闭环。', color: '#dc2626', icon: '🏗️' },
   { id: 'g60', name: '长三角G60科创走廊', nameEn: 'G60 S&T Innovation Corridor', author: '三省一市', year: '2016-', category: 'regional', summary: '跨区域协同创新载体，九城市联运，推动创新资源跨区域流动。', relevance: '苏州作为G60核心城市，可依托此机制承接上海技术溢出。', color: '#ef4444', icon: '🌐' },
 ]
 
@@ -22,10 +23,12 @@ export const CASES: Case[] = [
   { id: 'robokem', name: 'RoboChem-Flex无人实验室', type: 'industry', tags: ['自动化实验', '贝叶斯优化'], description: '仅需5000美元建成自动化实验平台，实验次数压缩60%以上。', outcomes: ['5000美元/台低成本部署', 'Nature Chemical Biology 2025'], votes: 35, featured: false, year: 2025, institution: '阿姆斯特丹大学', icon: '🧪' },
   { id: 'gusulab', name: '姑苏实验室', type: 'academic', tags: ['新型研发机构', '揭榜挂帅'], description: '苏州市财政投入200亿元，攻克多项"卡脖子"难题。', outcomes: ['揭榜挂帅41项需求，总投入50亿元'], votes: 29, featured: false, year: 2020, institution: '苏州市', icon: '🏛️' },
   { id: 'biobay', name: 'BioBAY生物医药产业园', type: 'industry', tags: ['生物医药', '1655亿产值'], description: '集聚生物医药企业超2000家，2024年产值达1655亿元。', outcomes: ['全国生物医药产业园区前三'], votes: 38, featured: false, year: 2006, institution: '苏州工业园区', icon: '💊' },
+  { id: 'huaxin', name: '华芯云睿——西浦首个教授创业项目完成天使轮融资', type: 'academic', tags: ['OPC', '芯片', '科技成果转化', '天使轮'], description: '2024年3月由西浦赵春教授创立，2026年7月完成数千万元天使轮融资（哇牛资本+善达投资领投，领军创投跟投）。布局光互连/光计算芯片和感存算芯片，已获数千万元客户订单。', outcomes: ['西浦首个教授创业项目——制度体系"首验案例"', '三层资本结构：产业资本(哇牛/汇川)+市场化基金(善达)+政策性基金(领军创投)', '学校持股提升市场信用，破解OPC"信任赤字"', '部分产品完成中试，进入客户验证与量产导入阶段'], votes: 65, featured: true, year: 2026, institution: '西交利物浦大学', icon: '💡' },
 ]
 
 export const INTLCASES: IntlCase[] = [
   { country: '美国', name: '波士顿肯德尔广场', model: '政府-产业-大学三螺旋', keyPoints: ['MIT TLO专业化技术转移', 'AI评估系统分析技术成熟度'], metrics: [{ label: '年度技术转移合同', value: '2.6亿美元' }, { label: '专利许可数', value: '1000+/年' }], color: '#1d4ed8' },
+  { country: '美国', name: '白宫X-Labs + Genesis Mission（2026）', model: '联邦科研体系重构', keyPoints: ['X-Labs：10-100人敏捷团队围绕技术瓶颈工作，NSF十年投入15亿美元', '"黄金票"机制：单评审人可支持未获共识的高风险项目', 'Genesis Mission：连接17个国家实验室的超级计算机和科学仪器', '将国家实验室向企业开放，设施评估纳入商业紧迫性'], metrics: [{ label: '联邦研发资金', value: '~2000亿美元/年' }, { label: '企业AI基建投入', value: '>4000亿美元(2025)' }], color: '#f59e0b' },
   { country: '德国', name: '巴登-符腾堡州', model: '弗劳恩霍夫中试模式', keyPoints: ['弗劳恩霍夫协会连接基础研究与产业', '中试项目成功率>85%'], metrics: [{ label: '年度预算', value: '30亿欧元' }, { label: '中试成功率', value: '>85%' }], color: '#15803d' },
   { country: '全球', name: '研究三角园 (RTP)', model: '大学-产业-政府协同', keyPoints: ['杜克+UNC+NC State三校协同', '3300+项专利积累'], metrics: [{ label: '年均研发投入', value: '>20亿美元' }, { label: '孵化器', value: '30+家' }], color: '#7c3aed' },
   { country: '中国', name: '松山湖材料实验室', model: '创新样板工厂', keyPoints: ['中试成功后直接产业化', '政府+科学家+企业家共治'], metrics: [{ label: '入驻团队', value: '50+个' }, { label: '产业化率', value: '>40%' }], color: '#dc2626' },
@@ -62,11 +65,11 @@ export const HW_MODULES: ModuleInfo[] = [
 ]
 
 export const RECOMMENDATIONS = [
-  { icon: '🏛️', title: '强化顶层设计', color: '#3b82f6', points: ['将AI+OPC融合纳入苏州市人工智能+城市行动计划', '完善科技成果转化相关政策'] },
-  { icon: '🤖', title: 'AI+OPC平台建设', color: '#8b5cf6', points: ['以开源tt_opc_platform为技术底座', '建设技术供需信息标准化格式'] },
-  { icon: '🎓', title: 'AI融创工坊育才', color: '#10b981', points: ['深化"企业出题-学员提案-原型制造-成果认证"模式', '每年培养复合型技术转移人才300人'] },
-  { icon: '🔒', title: '数据安全与隐私计算', color: '#06b6d4', points: ['联邦学习解决企业配方数据隐私', '数据完全自主可控'] },
-  { icon: '🌏', title: '产学研协同', color: '#ef4444', points: ['依托G60科创走廊承接上海技术溢出', '借鉴波士顿三螺旋模式'] },
+  { icon: '🏛️', title: '强化顶层设计', color: '#3b82f6', points: ['将AI+OPC融合纳入苏州市人工智能+城市行动计划', '落实OPC三年行动计划（2025-2028），目标集聚OPC人才超1万', '推进"138"计划和百个百万梦想基金池落地'] },
+  { icon: '🤖', title: 'AI+OPC平台建设', color: '#8b5cf6', points: ['以开源tt_opc_platform为技术底座', '建设技术供需信息标准化格式', '对接WAIC OPC专区资源，深化沪苏OPC生态合作'] },
+  { icon: '🎓', title: 'AI融创工坊育才', color: '#10b981', points: ['深化"企业出题-学员提案-原型制造-成果认证"模式', '每年培养复合型技术转移人才300人', '借鉴白宫X-Labs模式，探索10-100人敏捷攻关团队'] },
+  { icon: '🔒', title: '数据安全与隐私计算', color: '#06b6d4', points: ['联邦学习解决企业配方数据隐私', '数据完全自主可控', '参考白宫"科学验证器"概念，建设AI辅助的科研验证体系'] },
+  { icon: '🌏', title: '产学研协同', color: '#ef4444', points: ['依托G60科创走廊承接上海技术溢出', '深化沪苏OPC生态合作：场景互通、人才互认、生态互鉴', '借鉴波士顿三螺旋模式与白宫Genesis Mission经验'] },
 ]
 
 // ─── API 基础配置 ───
