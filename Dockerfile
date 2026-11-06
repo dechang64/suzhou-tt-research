@@ -32,10 +32,13 @@ COPY backend/server.py ./backend/
 # Create data directory
 RUN mkdir -p ./data ./fedctx-data
 
-ENV JWT_SECRET=change-me-in-production
+ENV JWT_SECRET=
 ENV FEDCTX_URL=http://fedctx:8090
 ENV PYTHONPATH=/app
 
 EXPOSE 8000
 
 CMD ["uvicorn", "backend.server:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+
+RUN useradd -m -s /bin/bash appuser
+USER appuser

@@ -1,3 +1,4 @@
+import os
 """TT-OPC 智能运营平台 FastAPI 后端
 统一 LLM 调用、模块 API、数据存储
 """
@@ -11,7 +12,7 @@ app = FastAPI(title="TT-OPC API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.environ.get("CORS_ORIGINS","*").split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

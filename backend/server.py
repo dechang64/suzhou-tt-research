@@ -1,3 +1,4 @@
+import os
 """TT-OPC 智能运营平台 FastAPI 后端 v5
 策略：fallback 即时返回 + LLM SSE 流式增强 + FedCtx 语义存储 + JWT 认证
 """
@@ -16,7 +17,7 @@ app = FastAPI(title="TT-OPC API", version="5.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.environ.get("CORS_ORIGINS","*").split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -531,11 +532,25 @@ async def fedctx_status():
 # 4. JWT 用户认证
 # ═══════════════════════════════════════════════════════════════
 
-JWT_SECRET = os.environ.get("JWT_SECRET", "tt-opc-secret-change-in-production")
+JWT_SECRET = os.environ.get("JWT_SECRET", "")
 JWT_ALGO = "HS256"
 
 def _hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+    """Hash password with salt using PBKDF2 (sha256 is not suitable for passwords)."""
+    import secrets
+    salt = secrets.token_hex(16)
+    h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000)
+    return f"{salt}${h.hex()}"
+
+def _verify_password(password: str, stored: str) -> bool:
+    """Verify password against stored salt$hash format."""
+    try:
+        salt, hash_hex = stored.split("$", 1)
+        h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000)
+        return h.hex() == hash_hex
+    except (ValueError, AttributeError):
+        # Fallback for old sha256 hashes (migration)
+        return hashlib.sha256(password.encode()).hexdigest() == stored
 
 def _create_token(username: str, role: str = "user") -> str:
     import base64
@@ -583,7 +598,7 @@ async def login(req: LoginRequest):
     conn = _get_db()
     row = conn.execute("SELECT * FROM users WHERE username=?", (req.username,)).fetchone()
     conn.close()
-    if not row or row["password_hash"] != _hash_password(req.password):
+    if not row or not _verify_password(req.password, row["password_hash"]):
         raise HTTPException(401, "用户名或密码错误")
     token = _create_token(req.username, row["role"])
     return {"token": token, "username": req.username, "role": row["role"]}
