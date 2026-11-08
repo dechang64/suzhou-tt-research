@@ -17,7 +17,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - JWT_SECRET=${JWT_SECRET:-tt-opc-secret-change-in-production}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set in .env}
       - FEDCTX_URL=http://fedctx:8090
     volumes:
       - tt_opc_data:/app/data

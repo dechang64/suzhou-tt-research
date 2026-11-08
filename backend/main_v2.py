@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 """TT-OPC 智能运营平台 FastAPI 后端
 统一 LLM 调用、模块 API、数据存储

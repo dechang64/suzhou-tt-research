@@ -36,7 +36,11 @@ fi
 
 # ─── 3. Start TT-OPC backend ───
 mkdir -p data
-export JWT_SECRET=${JWT_SECRET:-"tt-opc-secret-change-in-production"}
+if [ -z "$JWT_SECRET" ]; then
+    echo "❌ JWT_SECRET is not set. Please set it in .env or environment."
+    echo "   Example: export JWT_SECRET=\$(openssl rand -hex 32)"
+    exit 1
+fi
 export FEDCTX_URL=${FEDCTX_URL:-"http://localhost:8090"}
 
 echo "🔧 Starting TT-OPC API on port 8000..."

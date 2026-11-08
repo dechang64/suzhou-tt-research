@@ -25,6 +25,63 @@ app.add_middleware(
 
 _executor = ThreadPoolExecutor(max_workers=4)
 
+# ── JWT Auth (must be defined before endpoints) ────────────────────────────────
+JWT_SECRET = os.environ.get("JWT_SECRET", "")
+JWT_ALGO = "HS256"
+
+if not JWT_SECRET:
+    import sys
+    print("❌ JWT_SECRET is not set. Refusing to start with empty secret.", file=sys.stderr)
+    print("   Set it with: export JWT_SECRET=$(openssl rand -hex 32)", file=sys.stderr)
+    sys.exit(1)
+
+def _hash_password(password: str) -> str:
+    """Hash password with salt using PBKDF2 (sha256 is not suitable for passwords)."""
+    import secrets
+    salt = secrets.token_hex(16)
+    h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000)
+    return f"{salt}${h.hex()}"
+
+def _verify_password(password: str, stored: str) -> bool:
+    """Verify password against stored salt$hash format."""
+    try:
+        salt, hash_hex = stored.split("$", 1)
+        h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000)
+        return h.hex() == hash_hex
+    except (ValueError, AttributeError):
+        # Fallback for old sha256 hashes (migration)
+        return hashlib.sha256(password.encode()).hexdigest() == stored
+
+def _create_token(username: str, role: str = "user") -> str:
+    import base64
+    header = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).decode().rstrip("=")
+    payload = base64.urlsafe_b64encode(json.dumps({"sub": username, "role": role, "exp": (datetime.now() + timedelta(days=7)).isoformat()}).encode()).decode().rstrip("=")
+    sig = hmac.new(JWT_SECRET.encode(), f"{header}.{payload}".encode(), hashlib.sha256).hexdigest()
+    return f"{header}.{payload}.{sig}"
+
+def _verify_token(token: str) -> Optional[dict]:
+    try:
+        parts = token.split(".")
+        if len(parts) != 3: return None
+        sig = hmac.new(JWT_SECRET.encode(), f"{parts[0]}.{parts[1]}".encode(), hashlib.sha256).hexdigest()
+        if sig != parts[2]: return None
+        import base64
+        padding = 4 - len(parts[1]) % 4
+        payload = json.loads(base64.urlsafe_b64decode(parts[1] + "=" * padding))
+        if datetime.fromisoformat(payload["exp"]) < datetime.now(): return None
+        return payload
+    except Exception:
+        return None
+
+def _require_auth(token: str = ""):
+    """Dependency: require valid JWT token for write operations."""
+    if not token:
+        raise HTTPException(401, "缺少认证token，请先登录")
+    payload = _verify_token(token)
+    if not payload:
+        raise HTTPException(401, "无效或过期的token")
+    return payload
+
 def _llm_sync(system_prompt: str, user_prompt: str) -> Optional[str]:
     try:
         result = subprocess.run(
@@ -441,7 +498,7 @@ class SaveEvalRequest(BaseModel):
     type: str; input_data: dict; result_data: dict; source: str = "fallback"; user_id: str = "anonymous"
 
 @app.post("/api/evaluations")
-async def save_evaluation(req: SaveEvalRequest):
+async def save_evaluation(req: SaveEvalRequest, user=Depends(_require_auth)):
     """保存评估到 FedCtx（语义可检索）"""
     global _eval_counter
     _eval_counter += 1
@@ -529,49 +586,8 @@ async def fedctx_status():
 
 
 # ═══════════════════════════════════════════════════════════════
-# 4. JWT 用户认证
+# 4. JWT 用户认证 (defined above, before endpoints)
 # ═══════════════════════════════════════════════════════════════
-
-JWT_SECRET = os.environ.get("JWT_SECRET", "")
-JWT_ALGO = "HS256"
-
-def _hash_password(password: str) -> str:
-    """Hash password with salt using PBKDF2 (sha256 is not suitable for passwords)."""
-    import secrets
-    salt = secrets.token_hex(16)
-    h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000)
-    return f"{salt}${h.hex()}"
-
-def _verify_password(password: str, stored: str) -> bool:
-    """Verify password against stored salt$hash format."""
-    try:
-        salt, hash_hex = stored.split("$", 1)
-        h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000)
-        return h.hex() == hash_hex
-    except (ValueError, AttributeError):
-        # Fallback for old sha256 hashes (migration)
-        return hashlib.sha256(password.encode()).hexdigest() == stored
-
-def _create_token(username: str, role: str = "user") -> str:
-    import base64
-    header = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).decode().rstrip("=")
-    payload = base64.urlsafe_b64encode(json.dumps({"sub": username, "role": role, "exp": (datetime.now() + timedelta(days=7)).isoformat()}).encode()).decode().rstrip("=")
-    sig = hmac.new(JWT_SECRET.encode(), f"{header}.{payload}".encode(), hashlib.sha256).hexdigest()
-    return f"{header}.{payload}.{sig}"
-
-def _verify_token(token: str) -> Optional[dict]:
-    try:
-        parts = token.split(".")
-        if len(parts) != 3: return None
-        sig = hmac.new(JWT_SECRET.encode(), f"{parts[0]}.{parts[1]}".encode(), hashlib.sha256).hexdigest()
-        if sig != parts[2]: return None
-        import base64
-        padding = 4 - len(parts[1]) % 4
-        payload = json.loads(base64.urlsafe_b64decode(parts[1] + "=" * padding))
-        if datetime.fromisoformat(payload["exp"]) < datetime.now(): return None
-        return payload
-    except Exception:
-        return None
 
 class LoginRequest(BaseModel):
     username: str; password: str
